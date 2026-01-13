@@ -68,6 +68,16 @@ export class UserService {
       .select('+password');
   }
 
+  async findByEmailNoPassword(email: string): Promise<UserDocument | null> {
+    return this.userModel.findOne({ email: email.toLowerCase() });
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    await this.userModel.findByIdAndUpdate(userId, {
+      isEmailVerified: true,
+    });
+  }
+
   async update(
     id: string,
     updateUserDto: UpdateUserDto,

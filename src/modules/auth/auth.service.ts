@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   Inject,
   ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { ConfigType } from '@nestjs/config';
@@ -11,15 +12,27 @@ import { UserService } from '../user/user.service';
 import { RegisterDto } from './dto/register.dto';
 import jwtConfig from '../../config/jwt.config';
 import { UserDocument } from '../user/schemas/user.schema';
+import { RedisService } from '../../shared/services/redis';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
+    private readonly redisService: RedisService,
     @Inject(jwtConfig.KEY)
     private readonly config: ConfigType<typeof jwtConfig>,
   ) {}
+
+  private readonly emailVerificationTtlSeconds = 10 * 60;
+
+  private getEmailVerificationKey(email: string): string {
+    return `email_verification:${email.toLowerCase()}`;
+  }
+
+  private generateEmailVerificationCode(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
 
   async validateUser(
     email: string,
@@ -33,6 +46,10 @@ export class AuthService {
 
     if (!user.isActive) {
       throw new ForbiddenException('Account is deactivated');
+    }
+
+    if (!user.isEmailVerified) {
+      throw new ForbiddenException('Email is not verified');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -60,9 +77,53 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         roles: user.roles,
+        isEmailVerified: user.isEmailVerified,
       },
       ...tokens,
     };
+  }
+
+  async requestEmailVerification(email: string): Promise<{ email: string }> {
+    const user = await this.userService.findByEmailNoPassword(email);
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.isEmailVerified) {
+      return { email: user.email };
+    }
+
+    const code = this.generateEmailVerificationCode();
+    const key = this.getEmailVerificationKey(user.email);
+
+    await this.redisService.set(key, code, this.emailVerificationTtlSeconds);
+
+    return {
+      email: user.email,
+    };
+  }
+
+  async verifyEmail(email: string, code: string): Promise<void> {
+    const user = await this.userService.findByEmailNoPassword(email);
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.isEmailVerified) {
+      return;
+    }
+
+    const key = this.getEmailVerificationKey(user.email);
+    const storedCode = await this.redisService.get(key);
+
+    if (!storedCode || storedCode !== code) {
+      throw new UnauthorizedException('Invalid or expired verification code');
+    }
+
+    await this.userService.markEmailVerified(user._id.toString());
+    await this.redisService.del(key);
   }
 
   async register(registerDto: RegisterDto) {
@@ -81,6 +142,7 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         roles: user.roles,
+        isEmailVerified: user.isEmailVerified,
       },
       ...tokens,
     };

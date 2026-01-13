@@ -29,7 +29,7 @@ import { AuthModule } from './modules/auth';
     // Database
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         uri: configService.get<string>('database.uri'),
       }),
       inject: [ConfigService],

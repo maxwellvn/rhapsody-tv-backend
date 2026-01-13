@@ -21,6 +21,7 @@ import { UserService } from './user.service';
 import { CreateUserDto, UpdateUserDto } from './dto';
 import { Roles, CurrentUser } from '../../common/decorators';
 import { Role } from '../../shared/enums/role.enum';
+import type { UserDocument } from './schemas/user.schema';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -60,8 +61,8 @@ export class UserController {
   @Get('me')
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'Profile retrieved successfully' })
-  async getProfile(@CurrentUser() user: any) {
-    const fullUser = await this.userService.findById(user._id);
+  async getProfile(@CurrentUser() user: UserDocument) {
+    const fullUser = await this.userService.findById(user._id.toString());
     return {
       success: true,
       message: 'Profile retrieved successfully',
@@ -87,12 +88,18 @@ export class UserController {
   @ApiOperation({ summary: 'Update current user profile' })
   @ApiResponse({ status: 200, description: 'Profile updated successfully' })
   async updateProfile(
-    @CurrentUser() user: any,
+    @CurrentUser() user: UserDocument,
     @Body() updateUserDto: UpdateUserDto,
   ) {
     // Regular users cannot change their roles or active status
-    const { roles, isActive, isEmailVerified, ...safeUpdate } = updateUserDto;
-    const updatedUser = await this.userService.update(user._id, safeUpdate);
+    const safeUpdate: Partial<UpdateUserDto> = { ...updateUserDto };
+    delete safeUpdate.isActive;
+    delete safeUpdate.isEmailVerified;
+
+    const updatedUser = await this.userService.update(
+      user._id.toString(),
+      safeUpdate,
+    );
     return {
       success: true,
       message: 'Profile updated successfully',

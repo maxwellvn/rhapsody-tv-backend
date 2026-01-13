@@ -70,4 +70,4 @@ async function bootstrap() {
   logger.log(`Environment: ${nodeEnv}`);
 }
 
-bootstrap();
+void bootstrap();

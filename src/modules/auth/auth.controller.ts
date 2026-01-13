@@ -6,15 +6,25 @@ import {
   HttpCode,
   HttpStatus,
   Req,
+  UnauthorizedException,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import {
   ApiTags,
   ApiOperation,
+  ApiBody,
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, RefreshTokenDto } from './dto';
+import type { UserDocument } from '../user/schemas/user.schema';
+import {
+  RegisterDto,
+  LoginDto,
+  RefreshTokenDto,
+  RequestEmailVerificationDto,
+  VerifyEmailDto,
+} from './dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { Public, CurrentUser } from '../../common/decorators';
 
@@ -42,14 +52,57 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login with email and password' })
+  @ApiBody({ type: LoginDto })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  async login(@Req() req: any, @Body() _loginDto: LoginDto) {
+  async login(@Req() req: Request & { user: UserDocument }) {
     const result = await this.authService.login(req.user);
     return {
       success: true,
       message: 'Login successful',
       data: result,
+    };
+  }
+
+  @Public()
+  @Post('email/request-verification')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request email verification code' })
+  @ApiResponse({ status: 200, description: 'Verification code requested' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async requestEmailVerification(
+    @Body() requestDto: RequestEmailVerificationDto,
+  ) {
+    const result = await this.authService.requestEmailVerification(
+      requestDto.email,
+    );
+
+    return {
+      success: true,
+      message: 'Verification code requested',
+      data: result,
+    };
+  }
+
+  @Public()
+  @Post('email/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify email using 6 digit code' })
+  @ApiResponse({ status: 200, description: 'Email verified successfully' })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid or expired verification code',
+  })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
+    await this.authService.verifyEmail(
+      verifyEmailDto.email,
+      verifyEmailDto.code,
+    );
+
+    return {
+      success: true,
+      message: 'Email verified successfully',
     };
   }
 
@@ -62,15 +115,26 @@ export class AuthController {
   async refreshTokens(@Body() refreshTokenDto: RefreshTokenDto) {
     // Decode the refresh token to get the user ID
     // This is a simplified version - in production, you'd want more validation
-    const payload = JSON.parse(
+    const parsedPayload: unknown = JSON.parse(
       Buffer.from(
         refreshTokenDto.refreshToken.split('.')[1],
         'base64',
       ).toString(),
     );
 
+    if (!parsedPayload || typeof parsedPayload !== 'object') {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const payload = parsedPayload as Record<string, unknown>;
+    const userId = payload.sub;
+
+    if (typeof userId !== 'string') {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
     const tokens = await this.authService.refreshTokens(
-      payload.sub,
+      userId,
       refreshTokenDto.refreshToken,
     );
 
@@ -86,8 +150,8 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Logout user' })
   @ApiResponse({ status: 200, description: 'Logout successful' })
-  async logout(@CurrentUser() user: any) {
-    await this.authService.logout(user._id);
+  async logout(@CurrentUser() user: UserDocument) {
+    await this.authService.logout(user._id.toString());
     return {
       success: true,
       message: 'Logout successful',
