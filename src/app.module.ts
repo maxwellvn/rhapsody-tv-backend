@@ -4,7 +4,13 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 
 // Config
-import { appConfig, databaseConfig, redisConfig, jwtConfig } from './config';
+import {
+  appConfig,
+  databaseConfig,
+  redisConfig,
+  jwtConfig,
+  imagekitConfig,
+} from './config';
 
 // Common
 import { HttpExceptionFilter } from './common/filters';
@@ -12,17 +18,19 @@ import { JwtAuthGuard, RolesGuard } from './common/guards';
 
 // Shared
 import { RedisModule } from './shared/services/redis';
+import { ImageKitModule } from './shared/services/imagekit';
 
 // Modules
 import { UserModule } from './modules/user';
 import { AuthModule } from './modules/auth';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, redisConfig, jwtConfig],
+      load: [appConfig, databaseConfig, redisConfig, jwtConfig, imagekitConfig],
       envFilePath: ['.env', '.env.local'],
     }),
 
@@ -37,10 +45,12 @@ import { AuthModule } from './modules/auth';
 
     // Shared Modules
     RedisModule,
+    ImageKitModule,
 
     // Feature Modules
     AuthModule,
     UserModule,
+    AdminModule,
   ],
   providers: [
     // Global Exception Filter
