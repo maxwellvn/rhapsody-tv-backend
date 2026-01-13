@@ -32,6 +32,12 @@ export class Video {
   @Prop({ enum: VideoVisibility, default: VideoVisibility.PUBLIC, index: true })
   visibility: VideoVisibility;
 
+  @Prop({ default: 0 })
+  viewCount: number;
+
+  @Prop({ default: false })
+  isLive: boolean;
+
   @Prop({ default: true })
   isActive: boolean;
 

@@ -20,6 +20,15 @@ export class Channel {
   @Prop()
   coverImageUrl?: string;
 
+  @Prop({ default: 0 })
+  subscriberCount: number;
+
+  @Prop({ default: 0 })
+  videoCount: number;
+
+  @Prop({ trim: true })
+  websiteUrl?: string;
+
   @Prop({ default: true })
   isActive: boolean;
 }

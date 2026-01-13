@@ -43,6 +43,12 @@ export class LiveStream {
   @Prop()
   playbackUrl?: string;
 
+  @Prop()
+  rtmpUrl?: string;
+
+  @Prop()
+  streamKey?: string;
+
   @Prop({ default: false })
   isChatEnabled: boolean;
 }
