@@ -28,7 +28,7 @@ async function bootstrap() {
   });
 
   // Global prefix
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('v1');
 
   // Validation
   app.useGlobalPipes(
@@ -54,14 +54,14 @@ async function bootstrap() {
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api/docs', app, document, {
+    SwaggerModule.setup('v1/docs', app, document, {
       swaggerOptions: {
         persistAuthorization: true,
       },
     });
 
     logger.log(
-      `Swagger documentation available at http://localhost:${port}/api/docs`,
+      `Swagger documentation available at http://localhost:${port}/v1/docs`,
     );
   }
 

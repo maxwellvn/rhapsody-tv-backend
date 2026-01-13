@@ -19,9 +19,16 @@ import {
 import { AuthService } from './auth.service';
 import type { UserDocument } from '../user/schemas/user.schema';
 import {
+  ApiCreatedSuccessResponse,
+  ApiOkSuccessResponse,
+} from '../../common/swagger';
+import {
   RegisterDto,
   LoginDto,
   RefreshTokenDto,
+  AuthLoginResponseDto,
+  AuthTokensDto,
+  EmailOnlyResponseDto,
   RequestEmailVerificationDto,
   VerifyEmailDto,
 } from './dto';
@@ -36,7 +43,10 @@ export class AuthController {
   @Public()
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
-  @ApiResponse({ status: 201, description: 'User registered successfully' })
+  @ApiCreatedSuccessResponse({
+    description: 'User registered successfully',
+    model: AuthLoginResponseDto,
+  })
   @ApiResponse({ status: 409, description: 'User already exists' })
   async register(@Body() registerDto: RegisterDto) {
     const result = await this.authService.register(registerDto);
@@ -53,7 +63,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiBody({ type: LoginDto })
-  @ApiResponse({ status: 200, description: 'Login successful' })
+  @ApiOkSuccessResponse({
+    description: 'Login successful',
+    model: AuthLoginResponseDto,
+  })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Req() req: Request & { user: UserDocument }) {
     const result = await this.authService.login(req.user);
@@ -68,7 +81,10 @@ export class AuthController {
   @Post('email/request-verification')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request email verification code' })
-  @ApiResponse({ status: 200, description: 'Verification code requested' })
+  @ApiOkSuccessResponse({
+    description: 'Verification code requested',
+    model: EmailOnlyResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'User not found' })
   async requestEmailVerification(
     @Body() requestDto: RequestEmailVerificationDto,
@@ -88,7 +104,7 @@ export class AuthController {
   @Post('email/verify')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify email using 6 digit code' })
-  @ApiResponse({ status: 200, description: 'Email verified successfully' })
+  @ApiOkSuccessResponse({ description: 'Email verified successfully' })
   @ApiResponse({
     status: 401,
     description: 'Invalid or expired verification code',
@@ -110,7 +126,10 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token' })
-  @ApiResponse({ status: 200, description: 'Token refreshed successfully' })
+  @ApiOkSuccessResponse({
+    description: 'Token refreshed successfully',
+    model: AuthTokensDto,
+  })
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
   async refreshTokens(@Body() refreshTokenDto: RefreshTokenDto) {
     // Decode the refresh token to get the user ID
@@ -149,7 +168,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Logout user' })
-  @ApiResponse({ status: 200, description: 'Logout successful' })
+  @ApiOkSuccessResponse({ description: 'Logout successful' })
   async logout(@CurrentUser() user: UserDocument) {
     await this.authService.logout(user._id.toString());
     return {
