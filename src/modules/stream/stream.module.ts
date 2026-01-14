@@ -1,20 +1,44 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LiveStream, LiveStreamSchema } from './schemas/live-stream.schema';
 import {
   LiveStreamComment,
   LiveStreamCommentSchema,
 } from './schemas/live-stream-comment.schema';
+import {
+  LiveStreamBan,
+  LiveStreamBanSchema,
+} from './schemas/live-stream-ban.schema';
 import { Video, VideoSchema } from './schemas/video.schema';
+import { LivestreamGateway } from './gateways/livestream.gateway';
+import { LivestreamChatService } from './services/livestream-chat.service';
+import { LivestreamViewerService } from './services/livestream-viewer.service';
+import jwtConfig from '../../config/jwt.config';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: LiveStream.name, schema: LiveStreamSchema },
       { name: LiveStreamComment.name, schema: LiveStreamCommentSchema },
+      { name: LiveStreamBan.name, schema: LiveStreamBanSchema },
       { name: Video.name, schema: VideoSchema },
     ]),
+    ConfigModule.forFeature(jwtConfig),
+    JwtModule.registerAsync({
+      imports: [ConfigModule.forFeature(jwtConfig)],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('jwt.secret'),
+      }),
+      inject: [ConfigService],
+    }),
   ],
-  exports: [MongooseModule],
+  providers: [
+    LivestreamGateway,
+    LivestreamChatService,
+    LivestreamViewerService,
+  ],
+  exports: [MongooseModule, LivestreamChatService, LivestreamViewerService],
 })
 export class StreamModule {}
