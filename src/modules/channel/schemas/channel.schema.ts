@@ -8,7 +8,7 @@ export class Channel {
   @Prop({ required: true, trim: true })
   name: string;
 
-  @Prop({ required: true, unique: true, lowercase: true, trim: true })
+  @Prop({ required: true, lowercase: true, trim: true })
   slug: string;
 
   @Prop({ trim: true })
