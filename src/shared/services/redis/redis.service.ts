@@ -11,11 +11,7 @@ export class RedisService implements OnModuleDestroy {
     @Inject(redisConfig.KEY)
     private readonly config: ConfigType<typeof redisConfig>,
   ) {
-    this.client = new Redis({
-      host: this.config.host,
-      port: this.config.port,
-      password: this.config.password,
-    });
+    this.client = new Redis(this.config.url);
   }
 
   async onModuleDestroy() {
