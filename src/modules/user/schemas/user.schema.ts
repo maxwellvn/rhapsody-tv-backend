@@ -7,10 +7,7 @@ export type UserDocument = HydratedDocument<User>;
 @Schema({ timestamps: true })
 export class User {
   @Prop({ required: true, trim: true })
-  firstName: string;
-
-  @Prop({ required: true, trim: true })
-  lastName: string;
+  fullName: string;
 
   @Prop({ required: true, lowercase: true, trim: true })
   email: string;
@@ -40,11 +37,6 @@ export const UserSchema = SchemaFactory.createForClass(User);
 UserSchema.index({ email: 1 });
 UserSchema.index({ roles: 1 });
 UserSchema.index({ createdAt: -1 });
-
-// Virtual for full name
-UserSchema.virtual('fullName').get(function () {
-  return `${this.firstName} ${this.lastName}`;
-});
 
 // Ensure virtuals are included in JSON output
 UserSchema.set('toJSON', {

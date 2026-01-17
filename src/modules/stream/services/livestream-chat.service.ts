@@ -16,8 +16,7 @@ export interface CommentWithUser {
   content: string;
   user: {
     id: string;
-    firstName: string;
-    lastName: string;
+    fullName: string;
   };
   parentCommentId?: string;
   createdAt: Date;
@@ -55,7 +54,7 @@ export class LivestreamChatService {
     // Populate user info
     const populatedComment = await this.commentModel
       .findById(comment._id)
-      .populate('userId', 'firstName lastName')
+      .populate('userId', 'fullName')
       .lean();
 
     if (!populatedComment) {
@@ -64,8 +63,7 @@ export class LivestreamChatService {
 
     const user = populatedComment.userId as unknown as {
       _id: Types.ObjectId;
-      firstName: string;
-      lastName: string;
+      fullName: string;
     };
 
     return {
@@ -73,8 +71,7 @@ export class LivestreamChatService {
       content: populatedComment.message,
       user: {
         id: user._id.toString(),
-        firstName: user.firstName,
-        lastName: user.lastName,
+        fullName: user.fullName,
       },
       parentCommentId: populatedComment.parentCommentId?.toString(),
       createdAt: (populatedComment as unknown as { createdAt: Date }).createdAt,
@@ -95,15 +92,14 @@ export class LivestreamChatService {
       })
       .sort({ createdAt: -1 })
       .limit(limit)
-      .populate('userId', 'firstName lastName')
+      .populate('userId', 'fullName')
       .lean();
 
     // Reverse to get chronological order
     return comments.reverse().map((comment) => {
       const user = comment.userId as unknown as {
         _id: Types.ObjectId;
-        firstName: string;
-        lastName: string;
+        fullName: string;
       };
 
       return {
@@ -111,8 +107,7 @@ export class LivestreamChatService {
         content: comment.message,
         user: {
           id: user._id.toString(),
-          firstName: user.firstName,
-          lastName: user.lastName,
+          fullName: user.fullName,
         },
         parentCommentId: comment.parentCommentId?.toString(),
         createdAt: (comment as unknown as { createdAt: Date }).createdAt,
@@ -205,8 +200,8 @@ export class LivestreamChatService {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate('userId', 'firstName lastName email')
-      .populate('bannedBy', 'firstName lastName')
+      .populate('userId', 'fullName email')
+      .populate('bannedBy', 'fullName')
       .lean();
   }
 

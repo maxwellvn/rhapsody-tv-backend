@@ -8,11 +8,8 @@ export class AuthUserDto {
   @ApiProperty({ example: 'john.doe@example.com' })
   email: string;
 
-  @ApiProperty({ example: 'John' })
-  firstName: string;
-
-  @ApiProperty({ example: 'Doe' })
-  lastName: string;
+  @ApiProperty({ example: 'John Doe' })
+  fullName: string;
 
   @ApiProperty({ enum: Role, isArray: true, example: [Role.USER] })
   roles: Role[];

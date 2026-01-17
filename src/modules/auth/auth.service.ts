@@ -74,8 +74,7 @@ export class AuthService {
       user: {
         id: user._id,
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        fullName: user.fullName,
         roles: user.roles,
         isEmailVerified: user.isEmailVerified,
       },
@@ -139,8 +138,7 @@ export class AuthService {
       user: {
         id: user._id,
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        fullName: user.fullName,
         roles: user.roles,
         isEmailVerified: user.isEmailVerified,
       },
