@@ -24,6 +24,7 @@ import { ImageKitModule } from './shared/services/imagekit';
 import { UserModule } from './modules/user';
 import { AuthModule } from './modules/auth';
 import { AdminModule } from './modules/admin/admin.module';
+import { HomepageModule } from './modules/homepage';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { AdminModule } from './modules/admin/admin.module';
     AuthModule,
     UserModule,
     AdminModule,
+    HomepageModule,
   ],
   providers: [
     // Global Exception Filter
