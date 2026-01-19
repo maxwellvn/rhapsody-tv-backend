@@ -41,6 +41,12 @@ export class Video {
   @Prop({ default: true })
   isActive: boolean;
 
+  @Prop({ default: 0 })
+  likeCount: number;
+
+  @Prop({ default: 0 })
+  commentCount: number;
+
   @Prop({ index: true })
   publishedAt?: Date;
 }

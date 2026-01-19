@@ -25,6 +25,7 @@ import { UserModule } from './modules/user';
 import { AuthModule } from './modules/auth';
 import { AdminModule } from './modules/admin/admin.module';
 import { HomepageModule } from './modules/homepage';
+import { VodModule } from './modules/vod';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { HomepageModule } from './modules/homepage';
     UserModule,
     AdminModule,
     HomepageModule,
+    VodModule,
   ],
   providers: [
     // Global Exception Filter
