@@ -8,7 +8,7 @@ export class CommentUserDto {
   fullName: string;
 }
 
-export class CommentResponseDto {
+export class VodCommentResponseDto {
   @ApiProperty({ description: 'Comment ID' })
   id: string;
 
@@ -32,14 +32,14 @@ export class CommentResponseDto {
 
   @ApiPropertyOptional({
     description: 'Nested replies (only for top-level comments)',
-    type: [CommentResponseDto],
+    type: [VodCommentResponseDto],
   })
-  replies?: CommentResponseDto[];
+  replies?: VodCommentResponseDto[];
 }
 
-export class PaginatedCommentsResponseDto {
-  @ApiProperty({ type: [CommentResponseDto] })
-  comments: CommentResponseDto[];
+export class VodPaginatedCommentsResponseDto {
+  @ApiProperty({ type: [VodCommentResponseDto] })
+  comments: VodCommentResponseDto[];
 
   @ApiProperty({ description: 'Total number of comments' })
   total: number;

@@ -25,10 +25,10 @@ import {
   ApiOkSuccessResponse,
 } from '../../common/swagger';
 import {
-  VideoResponseDto,
-  PaginatedVideosResponseDto,
-  CommentResponseDto,
-  PaginatedCommentsResponseDto,
+  VodVideoResponseDto,
+  VodPaginatedVideosResponseDto,
+  VodCommentResponseDto,
+  VodPaginatedCommentsResponseDto,
 } from './dto';
 
 @ApiTags('VOD (Video on Demand)')
@@ -43,7 +43,7 @@ export class VodController {
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
   @ApiOkSuccessResponse({
     description: 'Videos retrieved successfully',
-    model: PaginatedVideosResponseDto,
+    model: VodPaginatedVideosResponseDto,
   })
   async getVideos(
     @Query('page') page?: number,
@@ -62,7 +62,7 @@ export class VodController {
   @ApiParam({ name: 'videoId', description: 'Video ID' })
   @ApiOkSuccessResponse({
     description: 'Video retrieved successfully',
-    model: VideoResponseDto,
+    model: VodVideoResponseDto,
   })
   async getVideoById(@Param('videoId') videoId: string) {
     const video = await this.vodService.getVideoById(videoId);
@@ -119,7 +119,7 @@ export class VodController {
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
   @ApiOkSuccessResponse({
     description: 'Comments retrieved successfully',
-    model: PaginatedCommentsResponseDto,
+    model: VodPaginatedCommentsResponseDto,
   })
   async getComments(
     @Param('videoId') videoId: string,
@@ -139,7 +139,7 @@ export class VodController {
   @ApiParam({ name: 'videoId', description: 'Video ID' })
   @ApiCreatedSuccessResponse({
     description: 'Comment added successfully',
-    model: CommentResponseDto,
+    model: VodCommentResponseDto,
   })
   async addComment(
     @CurrentUser() user: UserDocument,
@@ -164,7 +164,7 @@ export class VodController {
   @ApiParam({ name: 'commentId', description: 'Parent comment ID' })
   @ApiCreatedSuccessResponse({
     description: 'Reply added successfully',
-    model: CommentResponseDto,
+    model: VodCommentResponseDto,
   })
   async replyToComment(
     @CurrentUser() user: UserDocument,

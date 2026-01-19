@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class VideoResponseDto {
+export class VodVideoResponseDto {
   @ApiProperty({ description: 'Video ID' })
   id: string;
 
@@ -45,9 +45,9 @@ export class VideoResponseDto {
   };
 }
 
-export class PaginatedVideosResponseDto {
-  @ApiProperty({ type: [VideoResponseDto] })
-  videos: VideoResponseDto[];
+export class VodPaginatedVideosResponseDto {
+  @ApiProperty({ type: [VodVideoResponseDto] })
+  videos: VodVideoResponseDto[];
 
   @ApiProperty({ description: 'Total number of videos' })
   total: number;

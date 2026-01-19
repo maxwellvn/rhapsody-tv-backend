@@ -29,7 +29,6 @@ export const VideoCommentSchema = SchemaFactory.createForClass(VideoComment);
 // Indexes for efficient queries
 VideoCommentSchema.index({ videoId: 1, createdAt: -1 });
 VideoCommentSchema.index({ videoId: 1, parentCommentId: 1, createdAt: 1 });
-VideoCommentSchema.index({ parentCommentId: 1 });
 
 // Ensure __v is removed
 VideoCommentSchema.set('toJSON', {
