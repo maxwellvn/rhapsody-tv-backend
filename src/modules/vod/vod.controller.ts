@@ -203,4 +203,43 @@ export class VodController {
       message: result.message,
     };
   }
+
+  @Post('comments/:commentId/like')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Toggle like on a comment (like/unlike)' })
+  @ApiParam({ name: 'commentId', description: 'Comment ID' })
+  @ApiOkSuccessResponse({ description: 'Comment like toggled successfully' })
+  async toggleCommentLike(
+    @CurrentUser() user: UserDocument,
+    @Param('commentId') commentId: string,
+  ) {
+    const result = await this.vodService.toggleCommentLike(
+      user._id.toString(),
+      commentId,
+    );
+    return {
+      success: true,
+      message: result.message,
+      data: { liked: result.liked },
+    };
+  }
+
+  @Get('comments/:commentId/like-status')
+  @ApiOperation({ summary: 'Check if current user has liked the comment' })
+  @ApiParam({ name: 'commentId', description: 'Comment ID' })
+  @ApiOkSuccessResponse({ description: 'Like status retrieved successfully' })
+  async getCommentLikeStatus(
+    @CurrentUser() user: UserDocument,
+    @Param('commentId') commentId: string,
+  ) {
+    const result = await this.vodService.getCommentLikeStatus(
+      user._id.toString(),
+      commentId,
+    );
+    return {
+      success: true,
+      message: 'Like status retrieved successfully',
+      data: result,
+    };
+  }
 }

@@ -7,6 +7,7 @@ import {
   VideoComment,
   VideoCommentSchema,
 } from './schemas/video-comment.schema';
+import { CommentLike, CommentLikeSchema } from './schemas/comment-like.schema';
 import { VodController } from './vod.controller';
 import { VodService } from './vod.service';
 
@@ -17,6 +18,7 @@ import { VodService } from './vod.service';
       { name: Channel.name, schema: ChannelSchema },
       { name: VideoLike.name, schema: VideoLikeSchema },
       { name: VideoComment.name, schema: VideoCommentSchema },
+      { name: CommentLike.name, schema: CommentLikeSchema },
     ]),
   ],
   controllers: [VodController],

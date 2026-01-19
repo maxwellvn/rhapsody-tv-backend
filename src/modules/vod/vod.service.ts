@@ -12,6 +12,10 @@ import {
   VideoCommentDocument,
 } from './schemas/video-comment.schema';
 import { Channel, ChannelDocument } from '../channel/schemas/channel.schema';
+import {
+  CommentLike,
+  CommentLikeDocument,
+} from './schemas/comment-like.schema';
 import { CreateCommentDto } from './dto';
 
 @Injectable()
@@ -23,6 +27,8 @@ export class VodService {
     private readonly videoLikeModel: Model<VideoLikeDocument>,
     @InjectModel(VideoComment.name)
     private readonly videoCommentModel: Model<VideoCommentDocument>,
+    @InjectModel(CommentLike.name)
+    private readonly commentLikeModel: Model<CommentLikeDocument>,
     @InjectModel(Channel.name)
     private readonly channelModel: Model<ChannelDocument>,
   ) {}
@@ -315,6 +321,63 @@ export class VodService {
     });
 
     return { message: 'Comment deleted successfully' };
+  }
+
+  /**
+   * Toggle like on a comment
+   */
+  async toggleCommentLike(userId: string, commentId: string) {
+    if (!Types.ObjectId.isValid(commentId)) {
+      throw new BadRequestException('Invalid comment ID');
+    }
+
+    const comment = await this.videoCommentModel.findById(commentId);
+    if (!comment || comment.isDeleted) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    const userObjectId = new Types.ObjectId(userId);
+    const commentObjectId = new Types.ObjectId(commentId);
+
+    const existingLike = await this.commentLikeModel.findOne({
+      userId: userObjectId,
+      commentId: commentObjectId,
+    });
+
+    if (existingLike) {
+      // Unlike
+      await this.commentLikeModel.deleteOne({ _id: existingLike._id });
+      await this.videoCommentModel.findByIdAndUpdate(commentId, {
+        $inc: { likeCount: -1 },
+      });
+      return { liked: false, message: 'Comment unliked successfully' };
+    } else {
+      // Like
+      await this.commentLikeModel.create({
+        userId: userObjectId,
+        commentId: commentObjectId,
+      });
+      await this.videoCommentModel.findByIdAndUpdate(commentId, {
+        $inc: { likeCount: 1 },
+      });
+      return { liked: true, message: 'Comment liked successfully' };
+    }
+  }
+
+  /**
+   * Check if user has liked a comment
+   */
+  async getCommentLikeStatus(userId: string, commentId: string) {
+    if (!Types.ObjectId.isValid(commentId)) {
+      throw new BadRequestException('Invalid comment ID');
+    }
+
+    const like = await this.commentLikeModel.findOne({
+      userId: new Types.ObjectId(userId),
+      commentId: new Types.ObjectId(commentId),
+    });
+
+    return { liked: !!like };
   }
 
   /**
