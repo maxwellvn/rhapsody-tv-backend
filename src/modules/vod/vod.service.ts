@@ -467,7 +467,7 @@ export class VodService {
   // ============== WATCHLIST METHODS ==============
 
   /**
-   * Add video to watchlist
+   * Add video to watchlist (or toggle - removes if already exists)
    */
   async addToWatchlist(userId: string, videoId: string) {
     if (!Types.ObjectId.isValid(videoId)) {
@@ -485,7 +485,9 @@ export class VodService {
     });
 
     if (existing) {
-      throw new ConflictException('Video already in watchlist');
+      // Toggle behavior: remove if already in watchlist
+      await this.watchlistModel.findByIdAndDelete(existing._id);
+      return { message: 'Video removed from watchlist', inWatchlist: false };
     }
 
     await this.watchlistModel.create({
@@ -493,7 +495,7 @@ export class VodService {
       videoId: new Types.ObjectId(videoId),
     });
 
-    return { message: 'Video added to watchlist' };
+    return { message: 'Video added to watchlist', inWatchlist: true };
   }
 
   /**
