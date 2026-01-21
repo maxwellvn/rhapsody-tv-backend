@@ -92,10 +92,11 @@ export class ChannelController {
     const channelId = channel._id.toString();
 
     // Get video count for this channel (safely handle errors)
+    // Support both ObjectId and string formats for backward compatibility
     let videoCount = 0;
     try {
       videoCount = await this.videoModel.countDocuments({
-        channelId: channel._id,
+        channelId: { $in: [channel._id, channelId] },
         isActive: true,
         visibility: 'public',
       });
@@ -143,10 +144,11 @@ export class ChannelController {
     }
 
     // Get video count for this channel (safely handle errors)
+    // Support both ObjectId and string formats for backward compatibility
     let videoCount = 0;
     try {
       videoCount = await this.videoModel.countDocuments({
-        channelId: new Types.ObjectId(id),
+        channelId: { $in: [new Types.ObjectId(id), id] },
         isActive: true,
         visibility: 'public',
       });
