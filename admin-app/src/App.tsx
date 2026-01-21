@@ -20,9 +20,12 @@ const ProgramDetail = lazy(() => import('./pages/programs/ProgramDetail'));
 const LivestreamList = lazy(() => import('./pages/livestreams/LivestreamList'));
 const LivestreamDetail = lazy(() => import('./pages/livestreams/LivestreamDetail'));
 
+// Get basename for router - in production, app is served from /admin
+const basename = import.meta.env.PROD ? '/admin' : '/';
+
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
