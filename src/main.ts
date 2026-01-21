@@ -35,7 +35,8 @@ async function bootstrap() {
     app.use('/admin', expressStatic(adminPath));
     
     // SPA fallback - serve index.html for all /admin/* routes that don't match a file
-    app.use('/admin/*', (req: Request, res: Response, next: NextFunction) => {
+    // Express 5 uses {*path} syntax instead of * for wildcards
+    app.use('/admin/{*path}', (req: Request, res: Response, next: NextFunction) => {
       const indexPath = join(adminPath, 'index.html');
       if (existsSync(indexPath)) {
         res.sendFile(indexPath);
