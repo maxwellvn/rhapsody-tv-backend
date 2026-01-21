@@ -309,9 +309,9 @@ export class VodController {
 
   @Post(':videoId/watchlist')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Add video to watchlist' })
+  @ApiOperation({ summary: 'Toggle video in watchlist (add/remove)' })
   @ApiParam({ name: 'videoId', description: 'Video ID' })
-  @ApiOkSuccessResponse({ description: 'Video added to watchlist' })
+  @ApiOkSuccessResponse({ description: 'Watchlist updated' })
   async addToWatchlist(
     @CurrentUser() user: UserDocument,
     @Param('videoId') videoId: string,
@@ -323,6 +323,7 @@ export class VodController {
     return {
       success: true,
       message: result.message,
+      data: { inWatchlist: result.inWatchlist },
     };
   }
 
