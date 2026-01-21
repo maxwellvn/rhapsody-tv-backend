@@ -45,12 +45,13 @@ export class LivestreamService {
       query.status = { $in: [LiveStreamStatus.LIVE, LiveStreamStatus.SCHEDULED] };
     }
 
+    // Support both ObjectId and string formats for backward compatibility
     if (options?.channelId) {
-      query.channelId = new Types.ObjectId(options.channelId);
+      query.channelId = { $in: [new Types.ObjectId(options.channelId), options.channelId] };
     }
 
     if (options?.programId) {
-      query.programId = new Types.ObjectId(options.programId);
+      query.programId = { $in: [new Types.ObjectId(options.programId), options.programId] };
     }
 
     return this.livestreamModel
@@ -119,8 +120,9 @@ export class LivestreamService {
       return [];
     }
 
+    // Support both ObjectId and string formats for backward compatibility
     const query: Record<string, unknown> = {
-      channelId: new Types.ObjectId(channelId),
+      channelId: { $in: [new Types.ObjectId(channelId), channelId] },
     };
 
     if (!includeEnded) {
@@ -141,8 +143,9 @@ export class LivestreamService {
     programId: string,
     includeEnded = false,
   ): Promise<LiveStreamDocument[]> {
+    // Support both ObjectId and string formats for backward compatibility
     const query: Record<string, unknown> = {
-      programId: new Types.ObjectId(programId),
+      programId: { $in: [new Types.ObjectId(programId), programId] },
     };
 
     if (!includeEnded) {

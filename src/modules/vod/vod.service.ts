@@ -47,12 +47,13 @@ export class VodService {
     const skip = (page - 1) * limit;
     const filter: Record<string, any> = { isActive: true, visibility: 'public' };
     
+    // Support both ObjectId and string formats for backward compatibility
     if (programId && Types.ObjectId.isValid(programId)) {
-      filter.programId = new Types.ObjectId(programId);
+      filter.programId = { $in: [new Types.ObjectId(programId), programId] };
     }
     
     if (channelId && Types.ObjectId.isValid(channelId)) {
-      filter.channelId = new Types.ObjectId(channelId);
+      filter.channelId = { $in: [new Types.ObjectId(channelId), channelId] };
     }
 
     const [videos, total] = await Promise.all([
