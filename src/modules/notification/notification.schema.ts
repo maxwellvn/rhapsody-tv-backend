@@ -6,11 +6,17 @@ export type NotificationDocument = HydratedDocument<Notification>;
 export enum NotificationType {
   NEW_VIDEO = 'new_video',
   NEW_LIVESTREAM = 'new_livestream',
+  LIVESTREAM_STARTING = 'livestream_starting',
+  LIVESTREAM_LIVE = 'livestream_live',
+  NEW_CHANNEL = 'new_channel',
+  NEW_PROGRAM = 'new_program',
   COMMENT_REPLY = 'comment_reply',
   VIDEO_LIKE = 'video_like',
   NEW_SUBSCRIBER = 'new_subscriber',
   CHANNEL_UPDATE = 'channel_update',
   PROGRAM_REMINDER = 'program_reminder',
+  PROGRAM_STARTING = 'program_starting',
+  ANNOUNCEMENT = 'announcement',
   SYSTEM = 'system',
 }
 

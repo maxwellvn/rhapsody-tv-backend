@@ -1,15 +1,33 @@
-import { Controller, Get, Post, Delete, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Query, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { NotificationService } from './notification.service';
+import { PushNotificationService } from './push-notification.service';
 import { CurrentUser } from '../../common/decorators';
 import { ApiOkSuccessResponse } from '../../common/swagger';
 import type { UserDocument } from '../user/schemas/user.schema';
+import { IsString, IsOptional } from 'class-validator';
+
+class RegisterTokenDto {
+  @IsString()
+  token: string;
+
+  @IsOptional()
+  @IsString()
+  platform?: string;
+
+  @IsOptional()
+  @IsString()
+  deviceId?: string;
+}
 
 @ApiTags('Notifications')
 @ApiBearerAuth()
 @Controller('notifications')
 export class NotificationController {
-  constructor(private readonly notificationService: NotificationService) {}
+  constructor(
+    private readonly notificationService: NotificationService,
+    private readonly pushNotificationService: PushNotificationService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get user notifications' })
@@ -86,6 +104,44 @@ export class NotificationController {
     return {
       success: true,
       message: 'Notification deleted successfully',
+    };
+  }
+
+  @Post('register-token')
+  @ApiOperation({ summary: 'Register device token for push notifications' })
+  @ApiOkSuccessResponse({ description: 'Token registered successfully' })
+  async registerToken(
+    @CurrentUser() user: UserDocument,
+    @Body() dto: RegisterTokenDto,
+  ) {
+    await this.pushNotificationService.registerToken(
+      user._id.toString(),
+      dto.token,
+      dto.platform || 'expo',
+      dto.deviceId,
+    );
+
+    return {
+      success: true,
+      message: 'Push notification token registered successfully',
+    };
+  }
+
+  @Post('unregister-token')
+  @ApiOperation({ summary: 'Unregister device token' })
+  @ApiOkSuccessResponse({ description: 'Token unregistered successfully' })
+  async unregisterToken(
+    @CurrentUser() user: UserDocument,
+    @Body() dto: { token: string },
+  ) {
+    await this.pushNotificationService.unregisterToken(
+      user._id.toString(),
+      dto.token,
+    );
+
+    return {
+      success: true,
+      message: 'Push notification token unregistered successfully',
     };
   }
 }
