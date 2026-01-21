@@ -19,6 +19,7 @@ const ProgramList = lazy(() => import('./pages/programs/ProgramList'));
 const ProgramDetail = lazy(() => import('./pages/programs/ProgramDetail'));
 const LivestreamList = lazy(() => import('./pages/livestreams/LivestreamList'));
 const LivestreamDetail = lazy(() => import('./pages/livestreams/LivestreamDetail'));
+const NotificationSend = lazy(() => import('./pages/notifications/NotificationSend'));
 
 // Get basename for router - in production, app is served from /admin
 const basename = import.meta.env.PROD ? '/admin' : '/';
@@ -133,6 +134,16 @@ function App() {
               <ProtectedRoute>
                 <Suspense fallback={<Loader />}>
                   <LivestreamDetail />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <Suspense fallback={<Loader />}>
+                  <NotificationSend />
                 </Suspense>
               </ProtectedRoute>
             }

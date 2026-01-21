@@ -29,4 +29,5 @@ export const ROUTES = {
   PROGRAM_DETAIL: (id: string) => `/programs/${id}`,
   LIVESTREAMS: '/livestreams',
   LIVESTREAM_DETAIL: (id: string) => `/livestreams/${id}`,
+  NOTIFICATIONS: '/notifications',
 } as const;

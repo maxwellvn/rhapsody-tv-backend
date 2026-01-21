@@ -6,6 +6,7 @@ import {
   Video,
   Calendar,
   Radio,
+  Bell,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -25,6 +26,7 @@ const navItems: NavItem[] = [
   { label: 'Videos', icon: Video, path: ROUTES.VIDEOS },
   { label: 'Programs', icon: Calendar, path: ROUTES.PROGRAMS },
   { label: 'Livestreams', icon: Radio, path: ROUTES.LIVESTREAMS },
+  { label: 'Notifications', icon: Bell, path: ROUTES.NOTIFICATIONS },
 ];
 
 interface SidebarProps {
