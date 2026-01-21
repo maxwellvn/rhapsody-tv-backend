@@ -18,7 +18,7 @@ import {
 } from '@nestjs/swagger';
 import { VodService } from './vod.service';
 import { CreateCommentDto } from './dto';
-import { CurrentUser } from '../../common/decorators';
+import { CurrentUser, Public } from '../../common/decorators';
 import type { UserDocument } from '../user/schemas/user.schema';
 import {
   ApiCreatedSuccessResponse,
@@ -37,6 +37,7 @@ import {
 export class VodController {
   constructor(private readonly vodService: VodService) {}
 
+  @Public()
   @Get()
   @ApiOperation({ summary: 'Get all public videos (paginated)' })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
@@ -121,6 +122,7 @@ export class VodController {
 
   // ============== DYNAMIC :videoId ROUTES ==============
 
+  @Public()
   @Get(':videoId')
   @ApiOperation({ summary: 'Get video details and increment view count' })
   @ApiParam({ name: 'videoId', description: 'Video ID' })
@@ -176,6 +178,7 @@ export class VodController {
     };
   }
 
+  @Public()
   @Get(':videoId/comments')
   @ApiOperation({ summary: 'Get comments for a video (with nested replies)' })
   @ApiParam({ name: 'videoId', description: 'Video ID' })

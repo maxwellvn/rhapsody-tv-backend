@@ -4,12 +4,14 @@ import { LivestreamService } from './services/livestream.service';
 import { LiveStreamStatus } from './schemas/live-stream.schema';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Livestreams')
 @Controller('livestreams')
 export class LivestreamController {
   constructor(private readonly livestreamService: LivestreamService) {}
 
+  @Public()
   @Get()
   @ApiOperation({ summary: 'Get all active livestreams' })
   @ApiQuery({ name: 'status', required: false, enum: LiveStreamStatus })
@@ -35,6 +37,7 @@ export class LivestreamController {
     };
   }
 
+  @Public()
   @Get('live')
   @ApiOperation({ summary: 'Get currently live streams' })
   async getLiveNow() {
@@ -46,6 +49,7 @@ export class LivestreamController {
     };
   }
 
+  @Public()
   @Get('upcoming')
   @ApiOperation({ summary: 'Get upcoming scheduled livestreams' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
@@ -84,6 +88,7 @@ export class LivestreamController {
     };
   }
 
+  @Public()
   @Get('channel/:channelId')
   @ApiOperation({ summary: 'Get livestreams by channel' })
   @ApiParam({ name: 'channelId' })
@@ -103,6 +108,7 @@ export class LivestreamController {
     };
   }
 
+  @Public()
   @Get('program/:programId')
   @ApiOperation({ summary: 'Get livestreams by program' })
   @ApiParam({ name: 'programId' })
@@ -122,6 +128,7 @@ export class LivestreamController {
     };
   }
 
+  @Public()
   @Get(':id/stats')
   @ApiOperation({ summary: 'Get livestream stats (viewer count, like count)' })
   @ApiParam({ name: 'id' })
@@ -195,6 +202,7 @@ export class LivestreamController {
   }
 
   // Dynamic :id route MUST be last
+  @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Get a single livestream by ID' })
   @ApiParam({ name: 'id' })
