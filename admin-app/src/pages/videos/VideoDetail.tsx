@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { ArrowLeft, Video, Eye, Edit, Lock, Globe, EyeOff, Play } from 'lucide-react';
+import { ArrowLeft, Video, Eye, Edit, Lock, Globe, EyeOff, Play, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { videoService } from '@/services/api/video.service';
 import MainLayout from '@/components/layout/MainLayout';
@@ -170,6 +170,12 @@ const VideoDetail = () => {
                       >
                         {video.isActive ? 'Active' : 'Inactive'}
                       </span>
+                      {video.isFeatured && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                          <Star className="w-3 h-3" />
+                          Featured
+                        </span>
+                      )}
                     </div>
 
                     {video.description && (

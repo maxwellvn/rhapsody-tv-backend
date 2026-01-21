@@ -145,6 +145,7 @@ export interface Video {
   visibility: 'public' | 'unlisted' | 'private';
   viewCount: number;
   isActive: boolean;
+  isFeatured?: boolean;
   publishedAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -160,6 +161,7 @@ export interface CreateVideoRequest {
   durationSeconds?: number;
   visibility?: 'public' | 'unlisted' | 'private';
   isActive?: boolean;
+  isFeatured?: boolean;
 }
 
 export interface UpdateVideoRequest extends Partial<Omit<CreateVideoRequest, 'channelId'>> {}

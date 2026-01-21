@@ -88,6 +88,62 @@ export class VodService {
   }
 
   /**
+   * Get featured videos with pagination
+   */
+  async getFeaturedVideos(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const filter = { isActive: true, visibility: 'public', isFeatured: true };
+
+    const [videos, total] = await Promise.all([
+      this.videoModel
+        .find(filter)
+        .sort({ publishedAt: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('channelId', 'name logoUrl')
+        .populate('programId', 'title')
+        .exec(),
+      this.videoModel.countDocuments(filter),
+    ]);
+
+    return {
+      videos: videos.map((video) => this.formatVideoResponse(video)),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Get latest videos with pagination (sorted by createdAt)
+   */
+  async getLatestVideos(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const filter = { isActive: true, visibility: 'public' };
+
+    const [videos, total] = await Promise.all([
+      this.videoModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('channelId', 'name logoUrl')
+        .populate('programId', 'title')
+        .exec(),
+      this.videoModel.countDocuments(filter),
+    ]);
+
+    return {
+      videos: videos.map((video) => this.formatVideoResponse(video)),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
    * Get a single video by ID and increment view count
    */
   async getVideoById(videoId: string) {

@@ -64,6 +64,48 @@ export class VodController {
 
   // ============== STATIC ROUTES (must come before :videoId) ==============
 
+  @Public()
+  @Get('featured')
+  @ApiOperation({ summary: 'Get featured videos (paginated)' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiOkSuccessResponse({
+    description: 'Featured videos retrieved successfully',
+    model: VodPaginatedVideosResponseDto,
+  })
+  async getFeaturedVideos(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    const result = await this.vodService.getFeaturedVideos(page, limit);
+    return {
+      success: true,
+      message: 'Featured videos retrieved successfully',
+      data: result,
+    };
+  }
+
+  @Public()
+  @Get('latest')
+  @ApiOperation({ summary: 'Get latest videos (paginated)' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiOkSuccessResponse({
+    description: 'Latest videos retrieved successfully',
+    model: VodPaginatedVideosResponseDto,
+  })
+  async getLatestVideos(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    const result = await this.vodService.getLatestVideos(page, limit);
+    return {
+      success: true,
+      message: 'Latest videos retrieved successfully',
+      data: result,
+    };
+  }
+
   @Get('watchlist')
   @ApiOperation({ summary: 'Get user watchlist' })
   @ApiQuery({ name: 'page', required: false, type: Number })

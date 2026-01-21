@@ -33,6 +33,7 @@ const videoSchema = z.object({
   durationSeconds: z.number().min(0, 'Duration must be positive').optional(),
   visibility: z.enum(['public', 'unlisted', 'private']).default('public'),
   isActive: z.boolean().default(true),
+  isFeatured: z.boolean().default(false),
 });
 
 type VideoFormValues = z.infer<typeof videoSchema>;
@@ -93,6 +94,7 @@ const EditVideoForm = ({ video, onSuccess, onCancel }: EditVideoFormProps) => {
       durationSeconds: video.durationSeconds,
       visibility: video.visibility,
       isActive: video.isActive,
+      isFeatured: video.isFeatured || false,
     },
   });
 
@@ -108,6 +110,7 @@ const EditVideoForm = ({ video, onSuccess, onCancel }: EditVideoFormProps) => {
         durationSeconds: data.durationSeconds,
         visibility: data.visibility,
         isActive: data.isActive,
+        isFeatured: data.isFeatured,
       };
 
       const response = await videoService.updateVideo(video.id, payload);
@@ -328,6 +331,27 @@ const EditVideoForm = ({ video, onSuccess, onCancel }: EditVideoFormProps) => {
               )}
             />
           </div>
+
+          <FormField
+            control={form.control}
+            name="isFeatured"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center justify-between rounded-lg border border-yellow-200 p-4 bg-yellow-50">
+                <div className="space-y-0.5">
+                  <FormLabel className="text-black font-medium">Featured Video</FormLabel>
+                  <p className="text-sm text-gray-500">Featured videos appear in the Featured section on the home page</p>
+                </div>
+                <FormControl>
+                  <input
+                    type="checkbox"
+                    checked={field.value}
+                    onChange={field.onChange}
+                    className="h-5 w-5 rounded border-gray-300 text-yellow-500 focus:ring-yellow-500"
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
 
           <div className="flex gap-3 justify-end pt-4">
             {onCancel && (

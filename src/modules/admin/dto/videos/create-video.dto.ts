@@ -71,4 +71,9 @@ export class CreateVideoDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({ default: false, description: 'Mark video as featured' })
+  @IsOptional()
+  @IsBoolean()
+  isFeatured?: boolean;
 }

@@ -52,6 +52,9 @@ export class Video {
 
   @Prop({ index: true })
   publishedAt?: Date;
+
+  @Prop({ default: false, index: true })
+  isFeatured: boolean;
 }
 
 export const VideoSchema = SchemaFactory.createForClass(Video);
@@ -61,6 +64,7 @@ VideoSchema.index({ channelId: 1, createdAt: -1 });
 VideoSchema.index({ programId: 1, createdAt: -1 });
 VideoSchema.index({ visibility: 1, publishedAt: -1 });
 VideoSchema.index({ isActive: 1 });
+VideoSchema.index({ isFeatured: 1, createdAt: -1 });
 
 // Ensure __v is removed
 VideoSchema.set('toJSON', {
