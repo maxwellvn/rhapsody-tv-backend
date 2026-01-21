@@ -43,12 +43,16 @@ export class VodService {
   /**
    * Get all public videos with pagination
    */
-  async getVideos(page = 1, limit = 20, programId?: string) {
+  async getVideos(page = 1, limit = 20, programId?: string, channelId?: string) {
     const skip = (page - 1) * limit;
     const filter: Record<string, any> = { isActive: true, visibility: 'public' };
     
     if (programId) {
       filter.programId = new Types.ObjectId(programId);
+    }
+    
+    if (channelId) {
+      filter.channelId = new Types.ObjectId(channelId);
     }
 
     const [videos, total] = await Promise.all([
