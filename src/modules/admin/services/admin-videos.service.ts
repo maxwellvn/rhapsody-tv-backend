@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Video, VideoDocument } from '../../stream/schemas/video.schema';
 import { CreateVideoDto, UpdateVideoDto } from '../dto/videos';
 import { VideoProbeService } from '../../../shared/services/video-probe';
@@ -29,8 +29,8 @@ export class AdminVideosService {
 
     const video = new this.videoModel({
       ...dto,
-      channelId: dto.channelId,
-      programId: dto.programId,
+      channelId: new Types.ObjectId(dto.channelId),
+      programId: dto.programId ? new Types.ObjectId(dto.programId) : undefined,
       durationSeconds,
     });
 
@@ -91,6 +91,14 @@ export class AdminVideosService {
   async update(id: string, dto: UpdateVideoDto): Promise<VideoDocument> {
     // If playbackUrl is being updated and duration isn't provided, auto-calculate it
     let updateData: any = { ...dto };
+    
+    // Convert channelId and programId to ObjectId if provided
+    if (updateData.channelId) {
+      updateData.channelId = new Types.ObjectId(updateData.channelId);
+    }
+    if (updateData.programId) {
+      updateData.programId = new Types.ObjectId(updateData.programId);
+    }
     
     if (dto.playbackUrl && !dto.durationSeconds) {
       this.logger.log(`Auto-calculating duration for updated URL: ${dto.playbackUrl}`);
