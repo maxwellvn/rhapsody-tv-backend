@@ -4,6 +4,9 @@ import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { join } from 'path';
+import * as express from 'express';
+import { existsSync } from 'fs';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -23,6 +26,25 @@ async function bootstrap() {
     }),
   );
 
+  // Serve Admin SPA at /admin (before other routes)
+  const adminPath = join(__dirname, '..', 'public', 'admin');
+  if (existsSync(adminPath)) {
+    // Serve static assets
+    app.use('/admin', express.static(adminPath));
+    
+    // SPA fallback - serve index.html for all /admin/* routes that don't match a file
+    app.use('/admin/*', (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const indexPath = join(adminPath, 'index.html');
+      if (existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        next();
+      }
+    });
+    
+    logger.log('Admin SPA configured at /admin');
+  }
+
   // CORS
   app.enableCors({
     origin:
@@ -34,9 +56,9 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
-  // Global prefix - exclude admin and health routes
+  // Global prefix - only exclude health route (admin API stays under v1)
   app.setGlobalPrefix('v1', {
-    exclude: ['health', 'admin', 'admin/(.*)'],
+    exclude: ['health'],
   });
 
   // Validation
