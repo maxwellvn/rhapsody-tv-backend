@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Send, Bell, Users, Tv, Film, History, ArrowLeft } from 'lucide-react';
+import { Send, Bell, Users, Tv, Film, History, ArrowLeft, Video, Radio } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +20,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import MainLayout from '@/components/layout/MainLayout';
 import { channelService } from '@/services/api/channel.service';
 import { programService } from '@/services/api/program.service';
+import { videoService } from '@/services/api/video.service';
+import { livestreamService } from '@/services/api/livestream.service';
 import apiClient from '@/services/api/client';
 import { ROUTES } from '@/utils/constants';
 import { formatDateTime } from '@/utils/helpers';
@@ -39,8 +41,11 @@ const notificationSchema = z.object({
   target: z.enum(['all', 'channel_subscribers', 'program_subscribers']),
   channelId: z.string().optional(),
   programId: z.string().optional(),
+  linkType: z.enum(['none', 'video', 'livestream', 'channel', 'program']),
   videoId: z.string().optional(),
   livestreamId: z.string().optional(),
+  linkChannelId: z.string().optional(),
+  linkProgramId: z.string().optional(),
 });
 
 type NotificationFormValues = z.infer<typeof notificationSchema>;
@@ -82,6 +87,24 @@ const NotificationSend = () => {
     },
   });
 
+  // Fetch videos
+  const { data: videosData } = useQuery({
+    queryKey: ['videos', 1, 100],
+    queryFn: async () => {
+      const response = await videoService.getVideos({ page: 1, limit: 100 });
+      return response.data;
+    },
+  });
+
+  // Fetch livestreams
+  const { data: livestreamsData } = useQuery({
+    queryKey: ['livestreams', 1, 100],
+    queryFn: async () => {
+      const response = await livestreamService.getLivestreams({ page: 1, limit: 100 });
+      return response.data;
+    },
+  });
+
   // Fetch broadcast history
   const { data: historyData, isLoading: isLoadingHistory } = useQuery({
     queryKey: ['broadcast-history'],
@@ -101,15 +124,31 @@ const NotificationSend = () => {
       target: 'all',
       channelId: '',
       programId: '',
+      linkType: 'none',
       videoId: '',
       livestreamId: '',
+      linkChannelId: '',
+      linkProgramId: '',
     },
   });
 
   const watchTarget = form.watch('target');
+  const watchLinkType = form.watch('linkType');
 
   const sendNotificationMutation = useMutation({
     mutationFn: async (data: NotificationFormValues) => {
+      // Build the data object based on linkType
+      const linkData: Record<string, string | undefined> = {};
+      if (data.linkType === 'video' && data.videoId) {
+        linkData.videoId = data.videoId;
+      } else if (data.linkType === 'livestream' && data.livestreamId) {
+        linkData.livestreamId = data.livestreamId;
+      } else if (data.linkType === 'channel' && data.linkChannelId) {
+        linkData.channelId = data.linkChannelId;
+      } else if (data.linkType === 'program' && data.linkProgramId) {
+        linkData.programId = data.linkProgramId;
+      }
+
       const payload = {
         type: data.type,
         title: data.title,
@@ -118,12 +157,7 @@ const NotificationSend = () => {
         target: data.target,
         channelId: data.channelId || undefined,
         programId: data.programId || undefined,
-        data: {
-          videoId: data.videoId || undefined,
-          livestreamId: data.livestreamId || undefined,
-          channelId: data.channelId || undefined,
-          programId: data.programId || undefined,
-        },
+        data: linkData,
       };
       const response = await apiClient.post('/admin/notifications/send', payload);
       return response.data;
@@ -368,49 +402,147 @@ const NotificationSend = () => {
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="linkType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-black">Link To (when notification is tapped)</FormLabel>
+                    <FormControl>
+                      <select
+                        {...field}
+                        className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      >
+                        <option value="none">No Link</option>
+                        <option value="video">Video</option>
+                        <option value="livestream">Livestream</option>
+                        <option value="channel">Channel</option>
+                        <option value="program">Program</option>
+                      </select>
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                      Select where the notification should navigate when tapped
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {watchLinkType === 'video' && (
                 <FormField
                   control={form.control}
                   name="videoId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-black">Video ID (optional)</FormLabel>
+                      <FormLabel className="text-black flex items-center gap-2">
+                        <Video className="h-4 w-4" />
+                        Select Video
+                      </FormLabel>
                       <FormControl>
-                        <Input
+                        <select
                           {...field}
-                          placeholder="Link to video..."
-                          className="bg-white border-gray-300"
-                        />
+                          className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                          <option value="">Select a video...</option>
+                          {videosData?.videos?.map((video) => (
+                            <option key={video.id} value={video.id}>
+                              {video.title}
+                            </option>
+                          ))}
+                        </select>
                       </FormControl>
-                      <FormDescription className="text-xs">
-                        Opens video when tapped
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+              )}
 
+              {watchLinkType === 'livestream' && (
                 <FormField
                   control={form.control}
                   name="livestreamId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-black">Livestream ID (optional)</FormLabel>
+                      <FormLabel className="text-black flex items-center gap-2">
+                        <Radio className="h-4 w-4" />
+                        Select Livestream
+                      </FormLabel>
                       <FormControl>
-                        <Input
+                        <select
                           {...field}
-                          placeholder="Link to livestream..."
-                          className="bg-white border-gray-300"
-                        />
+                          className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                          <option value="">Select a livestream...</option>
+                          {livestreamsData?.livestreams?.map((livestream) => (
+                            <option key={livestream.id} value={livestream.id}>
+                              {livestream.title}
+                            </option>
+                          ))}
+                        </select>
                       </FormControl>
-                      <FormDescription className="text-xs">
-                        Opens livestream when tapped
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
+              )}
+
+              {watchLinkType === 'channel' && (
+                <FormField
+                  control={form.control}
+                  name="linkChannelId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-black flex items-center gap-2">
+                        <Tv className="h-4 w-4" />
+                        Select Channel
+                      </FormLabel>
+                      <FormControl>
+                        <select
+                          {...field}
+                          className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                          <option value="">Select a channel...</option>
+                          {channelsData?.channels?.map((channel) => (
+                            <option key={channel.id} value={channel.id}>
+                              {channel.name}
+                            </option>
+                          ))}
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {watchLinkType === 'program' && (
+                <FormField
+                  control={form.control}
+                  name="linkProgramId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-black flex items-center gap-2">
+                        <Film className="h-4 w-4" />
+                        Select Program
+                      </FormLabel>
+                      <FormControl>
+                        <select
+                          {...field}
+                          className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                          <option value="">Select a program...</option>
+                          {programsData?.programs?.map((program) => (
+                            <option key={program.id} value={program.id}>
+                              {program.title}
+                            </option>
+                          ))}
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <Button
                 type="submit"
