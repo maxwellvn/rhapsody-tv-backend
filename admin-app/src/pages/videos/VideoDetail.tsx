@@ -233,6 +233,15 @@ const VideoDetail = () => {
                   </p>
                 </div>
 
+                {video.programId && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 mb-1 block">Program</label>
+                    <p className="text-sm font-mono text-gray-900 bg-gray-50 px-3 py-2 rounded">
+                      {typeof video.programId === 'object' ? video.programId.title || video.programId.name : video.programId}
+                    </p>
+                  </div>
+                )}
+
                 <div>
                   <label className="text-sm font-medium text-gray-600 mb-1 block">Playback URL</label>
                   <a
