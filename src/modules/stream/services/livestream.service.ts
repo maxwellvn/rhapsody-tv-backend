@@ -11,6 +11,10 @@ import {
   LivestreamLike,
   LivestreamLikeDocument,
 } from '../schemas/livestream-like.schema';
+import {
+  LivestreamWatchHistory,
+  LivestreamWatchHistoryDocument,
+} from '../schemas/livestream-watch-history.schema';
 
 @Injectable()
 export class LivestreamService {
@@ -19,6 +23,8 @@ export class LivestreamService {
     private livestreamModel: Model<LiveStreamDocument>,
     @InjectModel(LivestreamLike.name)
     private livestreamLikeModel: Model<LivestreamLikeDocument>,
+    @InjectModel(LivestreamWatchHistory.name)
+    private livestreamWatchHistoryModel: Model<LivestreamWatchHistoryDocument>,
   ) {}
 
   /**
@@ -259,5 +265,104 @@ export class LivestreamService {
       $inc: { viewerCount: -1 },
       $max: { viewerCount: 0 }, // Ensure it doesn't go below 0
     });
+  }
+
+  /**
+   * Track livestream watch (add to history)
+   */
+  async trackWatch(
+    userId: string,
+    livestreamId: string,
+    watchedSeconds?: number,
+  ) {
+    if (!Types.ObjectId.isValid(livestreamId)) {
+      throw new BadRequestException('Invalid livestream ID');
+    }
+
+    const livestream = await this.livestreamModel.findById(livestreamId);
+    if (!livestream) {
+      throw new NotFoundException('Livestream not found');
+    }
+
+    const userObjectId = new Types.ObjectId(userId);
+    const livestreamObjectId = new Types.ObjectId(livestreamId);
+
+    await this.livestreamWatchHistoryModel.findOneAndUpdate(
+      { userId: userObjectId, livestreamId: livestreamObjectId },
+      {
+        $set: {
+          lastWatchedAt: new Date(),
+          ...(watchedSeconds !== undefined && { watchedSeconds }),
+        },
+      },
+      { upsert: true, new: true },
+    );
+
+    return { message: 'Watch history updated' };
+  }
+
+  /**
+   * Get user's livestream watch history
+   */
+  async getWatchHistory(userId: string, page: number = 1, limit: number = 20) {
+    const userObjectId = new Types.ObjectId(userId);
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      this.livestreamWatchHistoryModel
+        .find({ userId: userObjectId })
+        .sort({ lastWatchedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate({
+          path: 'livestreamId',
+          populate: [
+            { path: 'channelId', select: 'name slug logoUrl' },
+            { path: 'programId', select: 'title thumbnailUrl' },
+          ],
+        })
+        .lean(),
+      this.livestreamWatchHistoryModel.countDocuments({ userId: userObjectId }),
+    ]);
+
+    return {
+      items: items.map((item) => ({
+        id: item._id.toString(),
+        livestream: item.livestreamId,
+        watchedSeconds: item.watchedSeconds,
+        lastWatchedAt: item.lastWatchedAt,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Remove livestream from watch history
+   */
+  async removeFromWatchHistory(userId: string, livestreamId: string) {
+    const userObjectId = new Types.ObjectId(userId);
+    const livestreamObjectId = new Types.ObjectId(livestreamId);
+
+    await this.livestreamWatchHistoryModel.deleteOne({
+      userId: userObjectId,
+      livestreamId: livestreamObjectId,
+    });
+
+    return { message: 'Removed from watch history' };
+  }
+
+  /**
+   * Clear all livestream watch history for user
+   */
+  async clearWatchHistory(userId: string) {
+    const userObjectId = new Types.ObjectId(userId);
+    const result = await this.livestreamWatchHistoryModel.deleteMany({
+      userId: userObjectId,
+    });
+
+    return { deletedCount: result.deletedCount };
   }
 }

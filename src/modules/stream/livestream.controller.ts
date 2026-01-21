@@ -161,4 +161,47 @@ export class LivestreamController {
       data: livestream,
     };
   }
+
+  @Post(':id/watch')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Track livestream watch (add to history)' })
+  @ApiParam({ name: 'id' })
+  async trackWatch(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+  ) {
+    const result = await this.livestreamService.trackWatch(
+      user._id.toString(),
+      id,
+    );
+
+    return {
+      success: true,
+      message: result.message,
+    };
+  }
+
+  @Get('history/list')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get livestream watch history' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async getWatchHistory(
+    @CurrentUser() user: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const result = await this.livestreamService.getWatchHistory(
+      user._id.toString(),
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 20,
+    );
+
+    return {
+      success: true,
+      data: result,
+    };
+  }
 }
