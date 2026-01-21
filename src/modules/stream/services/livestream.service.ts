@@ -115,7 +115,10 @@ export class LivestreamService {
     channelId: string,
     includeEnded = false,
   ): Promise<LiveStreamDocument[]> {
-    // Query using ObjectId - MongoDB should handle the comparison properly
+    if (!Types.ObjectId.isValid(channelId)) {
+      return [];
+    }
+
     const query: Record<string, unknown> = {
       channelId: new Types.ObjectId(channelId),
     };
@@ -124,17 +127,11 @@ export class LivestreamService {
       query.status = { $in: [LiveStreamStatus.LIVE, LiveStreamStatus.SCHEDULED] };
     }
 
-    console.log('[LivestreamService] getByChannel query:', JSON.stringify(query));
-
-    const results = await this.livestreamModel
+    return this.livestreamModel
       .find(query)
       .populate('programId', 'name slug thumbnailUrl')
       .sort({ status: 1, scheduledStartAt: 1, createdAt: -1 })
       .exec();
-
-    console.log('[LivestreamService] getByChannel found:', results.length, 'livestreams');
-
-    return results;
   }
 
   /**

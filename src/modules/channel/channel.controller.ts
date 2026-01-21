@@ -91,15 +91,25 @@ export class ChannelController {
 
     const channelId = channel._id.toString();
 
-    // Get video count for this channel
-    const videoCount = await this.videoModel.countDocuments({
-      channelId: channel._id,
-      isActive: true,
-      visibility: 'public',
-    });
+    // Get video count for this channel (safely handle errors)
+    let videoCount = 0;
+    try {
+      videoCount = await this.videoModel.countDocuments({
+        channelId: channel._id,
+        isActive: true,
+        visibility: 'public',
+      });
+    } catch (e) {
+      console.error('Error getting video count:', e);
+    }
 
-    // Get subscriber count
-    const subscriberCount = await this.subscriptionService.getSubscriberCount(channelId);
+    // Get subscriber count (safely handle errors)
+    let subscriberCount = channel.subscriberCount || 0;
+    try {
+      subscriberCount = await this.subscriptionService.getSubscriberCount(channelId);
+    } catch (e) {
+      console.error('Error getting subscriber count:', e);
+    }
 
     // Transform to plain object and add computed fields
     const channelData = channel.toJSON();
@@ -132,15 +142,25 @@ export class ChannelController {
       throw new NotFoundException('Channel not found');
     }
 
-    // Get video count for this channel
-    const videoCount = await this.videoModel.countDocuments({
-      channelId: new Types.ObjectId(id),
-      isActive: true,
-      visibility: 'public',
-    });
+    // Get video count for this channel (safely handle errors)
+    let videoCount = 0;
+    try {
+      videoCount = await this.videoModel.countDocuments({
+        channelId: new Types.ObjectId(id),
+        isActive: true,
+        visibility: 'public',
+      });
+    } catch (e) {
+      console.error('Error getting video count:', e);
+    }
 
-    // Get subscriber count
-    const subscriberCount = await this.subscriptionService.getSubscriberCount(id);
+    // Get subscriber count (safely handle errors)
+    let subscriberCount = channel.subscriberCount || 0;
+    try {
+      subscriberCount = await this.subscriptionService.getSubscriberCount(id);
+    } catch (e) {
+      console.error('Error getting subscriber count:', e);
+    }
 
     // Transform to plain object and add computed fields
     const channelData = channel.toJSON();
