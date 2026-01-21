@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Send, Bell, Users, Tv, Film, History, ArrowLeft, Video, Radio } from 'lucide-react';
+import { Send, Bell, Users, Tv, Film, History, ArrowLeft, Video, Radio, Pencil, Trash2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import {
@@ -55,19 +55,29 @@ interface BroadcastHistoryItem {
   type: string;
   title: string;
   message: string;
+  imageUrl?: string;
   target: string;
   sentCount: number;
   failedCount: number;
   sentAt: string;
   createdAt: string;
-  channelId?: { name: string };
-  programId?: { title: string };
+  channelId?: { _id: string; name: string };
+  programId?: { _id: string; title: string };
+  data?: {
+    videoId?: string;
+    channelId?: string;
+    programId?: string;
+    livestreamId?: string;
+  };
 }
 
 const NotificationSend = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingNotification, setEditingNotification] = useState<BroadcastHistoryItem | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // Fetch channels
   const { data: channelsData } = useQuery({
@@ -172,6 +182,56 @@ const NotificationSend = () => {
     },
   });
 
+  const updateNotificationMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<NotificationFormValues> }) => {
+      // Build the data object based on linkType
+      const linkData: Record<string, string | undefined> = {};
+      if (data.linkType === 'video' && data.videoId) {
+        linkData.videoId = data.videoId;
+      } else if (data.linkType === 'livestream' && data.livestreamId) {
+        linkData.livestreamId = data.livestreamId;
+      } else if (data.linkType === 'channel' && data.linkChannelId) {
+        linkData.channelId = data.linkChannelId;
+      } else if (data.linkType === 'program' && data.linkProgramId) {
+        linkData.programId = data.linkProgramId;
+      }
+
+      const payload = {
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        imageUrl: data.imageUrl || undefined,
+        data: Object.keys(linkData).length > 0 ? linkData : undefined,
+      };
+      const response = await apiClient.patch(`/admin/notifications/${id}`, payload);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Notification updated successfully!');
+      setIsEditModalOpen(false);
+      setEditingNotification(null);
+      queryClient.invalidateQueries({ queryKey: ['broadcast-history'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to update notification');
+    },
+  });
+
+  const deleteNotificationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiClient.delete(`/admin/notifications/${id}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Notification deleted successfully!');
+      setDeleteConfirmId(null);
+      queryClient.invalidateQueries({ queryKey: ['broadcast-history'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to delete notification');
+    },
+  });
+
   const onSubmit = async (data: NotificationFormValues) => {
     setIsSubmitting(true);
     try {
@@ -211,6 +271,42 @@ const NotificationSend = () => {
       default:
         return type;
     }
+  };
+
+  const getLinkTypeFromData = (data?: BroadcastHistoryItem['data']): 'none' | 'video' | 'livestream' | 'channel' | 'program' => {
+    if (!data) return 'none';
+    if (data.videoId) return 'video';
+    if (data.livestreamId) return 'livestream';
+    if (data.channelId) return 'channel';
+    if (data.programId) return 'program';
+    return 'none';
+  };
+
+  const handleEditClick = (item: BroadcastHistoryItem) => {
+    setEditingNotification(item);
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingNotification) return;
+
+    const formData = new FormData(e.currentTarget);
+    const linkType = formData.get('linkType') as string;
+    
+    const data: Partial<NotificationFormValues> = {
+      type: formData.get('type') as NotificationFormValues['type'],
+      title: formData.get('title') as string,
+      message: formData.get('message') as string,
+      imageUrl: formData.get('imageUrl') as string || '',
+      linkType: linkType as NotificationFormValues['linkType'],
+      videoId: linkType === 'video' ? formData.get('videoId') as string : undefined,
+      livestreamId: linkType === 'livestream' ? formData.get('livestreamId') as string : undefined,
+      linkChannelId: linkType === 'channel' ? formData.get('linkChannelId') as string : undefined,
+      linkProgramId: linkType === 'program' ? formData.get('linkProgramId') as string : undefined,
+    };
+
+    updateNotificationMutation.mutate({ id: editingNotification._id, data });
   };
 
   return (
@@ -591,9 +687,25 @@ const NotificationSend = () => {
                         {getTargetLabel(item.target)}
                       </span>
                     </div>
-                    <span className="text-xs text-gray-500">
-                      {formatDateTime(item.sentAt || item.createdAt)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">
+                        {formatDateTime(item.sentAt || item.createdAt)}
+                      </span>
+                      <button
+                        onClick={() => handleEditClick(item)}
+                        className="p-1 hover:bg-gray-200 rounded transition-colors"
+                        title="Edit notification"
+                      >
+                        <Pencil className="h-4 w-4 text-gray-500" />
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirmId(item._id)}
+                        className="p-1 hover:bg-red-100 rounded transition-colors"
+                        title="Delete notification"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </button>
+                    </div>
                   </div>
                   <h3 className="font-semibold text-black mb-1">{item.title}</h3>
                   <p className="text-sm text-gray-600 mb-2">{item.message}</p>
@@ -620,12 +732,224 @@ const NotificationSend = () => {
                       </span>
                     )}
                   </div>
+
+                  {/* Delete Confirmation */}
+                  {deleteConfirmId === item._id && (
+                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-700 mb-2">Are you sure you want to delete this notification?</p>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => deleteNotificationMutation.mutate(item._id)}
+                          disabled={deleteNotificationMutation.isPending}
+                        >
+                          {deleteNotificationMutation.isPending ? 'Deleting...' : 'Delete'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setDeleteConfirmId(null)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {isEditModalOpen && editingNotification && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold text-black">Edit Notification</h2>
+              <button
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingNotification(null);
+                }}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-black mb-1">Notification Type</label>
+                <select
+                  name="type"
+                  defaultValue={editingNotification.type}
+                  className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm"
+                >
+                  <option value="announcement">Announcement</option>
+                  <option value="new_video">New Video</option>
+                  <option value="new_livestream">New Livestream</option>
+                  <option value="new_channel">New Channel</option>
+                  <option value="new_program">New Program</option>
+                  <option value="system">System Message</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-black mb-1">Title *</label>
+                <Input
+                  name="title"
+                  defaultValue={editingNotification.title}
+                  placeholder="Notification title..."
+                  className="bg-white border-gray-300"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-black mb-1">Message *</label>
+                <textarea
+                  name="message"
+                  defaultValue={editingNotification.message}
+                  rows={3}
+                  placeholder="Notification message..."
+                  className="flex w-full rounded-md border border-input bg-white px-3 py-2 text-sm"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-black mb-1">Image URL (optional)</label>
+                <Input
+                  name="imageUrl"
+                  defaultValue={editingNotification.imageUrl || ''}
+                  type="url"
+                  placeholder="https://example.com/image.jpg"
+                  className="bg-white border-gray-300"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-black mb-1">Link To</label>
+                <select
+                  name="linkType"
+                  defaultValue={getLinkTypeFromData(editingNotification.data)}
+                  className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm"
+                  onChange={(e) => {
+                    // Force re-render to show/hide link dropdowns
+                    const form = e.target.form;
+                    if (form) {
+                      const event = new Event('change', { bubbles: true });
+                      form.dispatchEvent(event);
+                    }
+                  }}
+                >
+                  <option value="none">No Link</option>
+                  <option value="video">Video</option>
+                  <option value="livestream">Livestream</option>
+                  <option value="channel">Channel</option>
+                  <option value="program">Program</option>
+                </select>
+              </div>
+
+              {getLinkTypeFromData(editingNotification.data) === 'video' && (
+                <div>
+                  <label className="block text-sm font-medium text-black mb-1">Select Video</label>
+                  <select
+                    name="videoId"
+                    defaultValue={editingNotification.data?.videoId || ''}
+                    className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">Select a video...</option>
+                    {videosData?.videos?.map((video) => (
+                      <option key={video.id} value={video.id}>
+                        {video.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {getLinkTypeFromData(editingNotification.data) === 'livestream' && (
+                <div>
+                  <label className="block text-sm font-medium text-black mb-1">Select Livestream</label>
+                  <select
+                    name="livestreamId"
+                    defaultValue={editingNotification.data?.livestreamId || ''}
+                    className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">Select a livestream...</option>
+                    {livestreamsData?.livestreams?.map((livestream) => (
+                      <option key={livestream.id} value={livestream.id}>
+                        {livestream.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {getLinkTypeFromData(editingNotification.data) === 'channel' && (
+                <div>
+                  <label className="block text-sm font-medium text-black mb-1">Select Channel</label>
+                  <select
+                    name="linkChannelId"
+                    defaultValue={editingNotification.data?.channelId || ''}
+                    className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">Select a channel...</option>
+                    {channelsData?.channels?.map((channel) => (
+                      <option key={channel.id} value={channel.id}>
+                        {channel.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {getLinkTypeFromData(editingNotification.data) === 'program' && (
+                <div>
+                  <label className="block text-sm font-medium text-black mb-1">Select Program</label>
+                  <select
+                    name="linkProgramId"
+                    defaultValue={editingNotification.data?.programId || ''}
+                    className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">Select a program...</option>
+                    {programsData?.programs?.map((program) => (
+                      <option key={program.id} value={program.id}>
+                        {program.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-4">
+                <Button
+                  type="submit"
+                  disabled={updateNotificationMutation.isPending}
+                  className="flex-1 bg-[#0000FF] hover:bg-[#0000CC] text-white"
+                >
+                  {updateNotificationMutation.isPending ? 'Saving...' : 'Save Changes'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setEditingNotification(null);
+                  }}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 };

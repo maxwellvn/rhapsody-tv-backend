@@ -28,6 +28,20 @@ export interface SendNotificationDto {
   };
 }
 
+export interface UpdateNotificationDto {
+  type?: NotificationType;
+  title?: string;
+  message?: string;
+  imageUrl?: string;
+  data?: {
+    videoId?: string;
+    channelId?: string;
+    programId?: string;
+    livestreamId?: string;
+    link?: string;
+  };
+}
+
 @Injectable()
 export class AdminNotificationsService {
   private readonly logger = new Logger(AdminNotificationsService.name);
@@ -157,6 +171,63 @@ export class AdminNotificationsService {
       total,
       pages: Math.ceil(total / limit),
     };
+  }
+
+  /**
+   * Get a broadcast notification by ID
+   */
+  async getBroadcastById(id: string): Promise<BroadcastNotificationDocument> {
+    const broadcast = await this.broadcastModel
+      .findById(id)
+      .populate('channelId', 'name')
+      .populate('programId', 'title')
+      .populate('sentBy', 'fullName email');
+
+    if (!broadcast) {
+      throw new Error('Broadcast notification not found');
+    }
+
+    return broadcast;
+  }
+
+  /**
+   * Update a broadcast notification
+   */
+  async updateBroadcast(
+    id: string,
+    dto: UpdateNotificationDto,
+  ): Promise<BroadcastNotificationDocument> {
+    const broadcast = await this.broadcastModel.findByIdAndUpdate(
+      id,
+      {
+        ...(dto.type && { type: dto.type }),
+        ...(dto.title && { title: dto.title }),
+        ...(dto.message && { message: dto.message }),
+        ...(dto.imageUrl !== undefined && { imageUrl: dto.imageUrl }),
+        ...(dto.data && { data: dto.data }),
+      },
+      { new: true },
+    );
+
+    if (!broadcast) {
+      throw new Error('Broadcast notification not found');
+    }
+
+    this.logger.log(`Broadcast notification updated: ${id}`);
+    return broadcast;
+  }
+
+  /**
+   * Delete a broadcast notification
+   */
+  async deleteBroadcast(id: string): Promise<void> {
+    const result = await this.broadcastModel.findByIdAndDelete(id);
+
+    if (!result) {
+      throw new Error('Broadcast notification not found');
+    }
+
+    this.logger.log(`Broadcast notification deleted: ${id}`);
   }
 
   /**

@@ -2,7 +2,10 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
+  Delete,
   Body,
+  Param,
   Query,
 } from '@nestjs/common';
 import {
@@ -11,7 +14,7 @@ import {
   ApiBearerAuth,
   ApiQuery,
 } from '@nestjs/swagger';
-import { AdminNotificationsService, SendNotificationDto } from '../services/admin-notifications.service';
+import { AdminNotificationsService, SendNotificationDto, UpdateNotificationDto } from '../services/admin-notifications.service';
 import { CurrentUser, Roles } from '../../../common/decorators';
 import { Role } from '../../../shared/enums/role.enum';
 import type { UserDocument } from '../../user/schemas/user.schema';
@@ -43,6 +46,34 @@ class CreateNotificationDto implements SendNotificationDto {
   @IsOptional()
   @IsString()
   programId?: string;
+
+  @IsOptional()
+  @IsObject()
+  data?: {
+    videoId?: string;
+    channelId?: string;
+    programId?: string;
+    livestreamId?: string;
+    link?: string;
+  };
+}
+
+class UpdateNotificationBodyDto implements UpdateNotificationDto {
+  @IsOptional()
+  @IsEnum(NotificationType)
+  type?: NotificationType;
+
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  message?: string;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
 
   @IsOptional()
   @IsObject()
@@ -102,6 +133,44 @@ export class AdminNotificationsController {
       success: true,
       message: 'Broadcast history retrieved successfully',
       data: result,
+    };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a broadcast notification by ID' })
+  async getBroadcastById(@Param('id') id: string) {
+    const broadcast = await this.notificationsService.getBroadcastById(id);
+
+    return {
+      success: true,
+      message: 'Broadcast notification retrieved successfully',
+      data: broadcast,
+    };
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update a broadcast notification' })
+  async updateBroadcast(
+    @Param('id') id: string,
+    @Body() dto: UpdateNotificationBodyDto,
+  ) {
+    const broadcast = await this.notificationsService.updateBroadcast(id, dto);
+
+    return {
+      success: true,
+      message: 'Broadcast notification updated successfully',
+      data: broadcast,
+    };
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a broadcast notification' })
+  async deleteBroadcast(@Param('id') id: string) {
+    await this.notificationsService.deleteBroadcast(id);
+
+    return {
+      success: true,
+      message: 'Broadcast notification deleted successfully',
     };
   }
 }
