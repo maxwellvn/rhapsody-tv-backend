@@ -6,6 +6,9 @@ export class LivestreamViewerService {
   private readonly VIEWER_SET_PREFIX = 'livestream:viewers:';
   private readonly VIEWER_TTL_SECONDS = 3600; // 1 hour TTL for cleanup
 
+  // In-memory fallback when Redis is not available
+  private memoryViewers: Map<string, Set<string>> = new Map();
+
   constructor(private readonly redisService: RedisService) {}
 
   /**
@@ -22,9 +25,16 @@ export class LivestreamViewerService {
     const key = this.getViewerKey(livestreamId);
     const client = this.redisService.getClient();
 
-    await client.sadd(key, userId);
-    // Refresh TTL on activity
-    await client.expire(key, this.VIEWER_TTL_SECONDS);
+    if (client && this.redisService.isAvailable()) {
+      await client.sadd(key, userId);
+      await client.expire(key, this.VIEWER_TTL_SECONDS);
+    } else {
+      // Fallback to in-memory
+      if (!this.memoryViewers.has(livestreamId)) {
+        this.memoryViewers.set(livestreamId, new Set());
+      }
+      this.memoryViewers.get(livestreamId)!.add(userId);
+    }
 
     return this.getViewerCount(livestreamId);
   }
@@ -36,7 +46,12 @@ export class LivestreamViewerService {
     const key = this.getViewerKey(livestreamId);
     const client = this.redisService.getClient();
 
-    await client.srem(key, userId);
+    if (client && this.redisService.isAvailable()) {
+      await client.srem(key, userId);
+    } else {
+      // Fallback to in-memory
+      this.memoryViewers.get(livestreamId)?.delete(userId);
+    }
 
     return this.getViewerCount(livestreamId);
   }
@@ -48,7 +63,12 @@ export class LivestreamViewerService {
     const key = this.getViewerKey(livestreamId);
     const client = this.redisService.getClient();
 
-    return client.scard(key);
+    if (client && this.redisService.isAvailable()) {
+      return client.scard(key);
+    }
+    
+    // Fallback to in-memory
+    return this.memoryViewers.get(livestreamId)?.size || 0;
   }
 
   /**
@@ -58,8 +78,13 @@ export class LivestreamViewerService {
     const key = this.getViewerKey(livestreamId);
     const client = this.redisService.getClient();
 
-    const result = await client.sismember(key, userId);
-    return result === 1;
+    if (client && this.redisService.isAvailable()) {
+      const result = await client.sismember(key, userId);
+      return result === 1;
+    }
+    
+    // Fallback to in-memory
+    return this.memoryViewers.get(livestreamId)?.has(userId) || false;
   }
 
   /**
@@ -69,7 +94,13 @@ export class LivestreamViewerService {
     const key = this.getViewerKey(livestreamId);
     const client = this.redisService.getClient();
 
-    return client.smembers(key);
+    if (client && this.redisService.isAvailable()) {
+      return client.smembers(key);
+    }
+    
+    // Fallback to in-memory
+    const viewers = this.memoryViewers.get(livestreamId);
+    return viewers ? Array.from(viewers) : [];
   }
 
   /**
@@ -78,5 +109,8 @@ export class LivestreamViewerService {
   async clearViewers(livestreamId: string): Promise<void> {
     const key = this.getViewerKey(livestreamId);
     await this.redisService.del(key);
+    
+    // Also clear in-memory
+    this.memoryViewers.delete(livestreamId);
   }
 }

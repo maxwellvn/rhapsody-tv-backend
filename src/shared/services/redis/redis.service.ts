@@ -28,8 +28,14 @@ export class RedisService implements OnModuleDestroy {
     try {
       this.client = new Redis(this.config.url, {
         maxRetriesPerRequest: 3,
-        retryDelayOnFailover: 100,
         lazyConnect: true,
+        retryStrategy: (times) => {
+          if (times > 3) {
+            this.logger.warn('Redis max retries reached, giving up');
+            return null;
+          }
+          return Math.min(times * 100, 3000);
+        },
       });
 
       this.client.on('connect', () => {
