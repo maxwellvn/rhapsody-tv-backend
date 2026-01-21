@@ -72,6 +72,10 @@ COPY --from=backend-builder --chown=nestjs:nodejs /app/package.json ./
 # Copy built admin app to public/admin directory
 COPY --from=admin-builder --chown=nestjs:nodejs /app/admin-app/dist ./public/admin
 
+# Copy and setup entrypoint script
+COPY --chown=nestjs:nodejs docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+
 # Set environment variables
 ENV NODE_ENV=production
 ENV PORT=3000
@@ -82,5 +86,5 @@ USER nestjs
 # Expose port
 EXPOSE 3000
 
-# Start the application
-CMD ["node", "dist/main.js"]
+# Start the application with seed
+CMD ["./docker-entrypoint.sh"]
