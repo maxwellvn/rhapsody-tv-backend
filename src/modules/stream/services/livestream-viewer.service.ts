@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { RedisService } from '../../../shared/services/redis/redis.service';
+import { LiveStream, LiveStreamDocument } from '../schemas/live-stream.schema';
 
 @Injectable()
 export class LivestreamViewerService {
@@ -9,7 +12,11 @@ export class LivestreamViewerService {
   // In-memory fallback when Redis is not available
   private memoryViewers: Map<string, Set<string>> = new Map();
 
-  constructor(private readonly redisService: RedisService) {}
+  constructor(
+    private readonly redisService: RedisService,
+    @InjectModel(LiveStream.name)
+    private readonly livestreamModel: Model<LiveStreamDocument>,
+  ) {}
 
   /**
    * Get the Redis key for a livestream's viewer set
@@ -36,7 +43,12 @@ export class LivestreamViewerService {
       this.memoryViewers.get(livestreamId)!.add(userId);
     }
 
-    return this.getViewerCount(livestreamId);
+    const count = await this.getViewerCount(livestreamId);
+    
+    // Update MongoDB with the current viewer count
+    await this.updateMongoViewerCount(livestreamId, count);
+    
+    return count;
   }
 
   /**
@@ -53,7 +65,12 @@ export class LivestreamViewerService {
       this.memoryViewers.get(livestreamId)?.delete(userId);
     }
 
-    return this.getViewerCount(livestreamId);
+    const count = await this.getViewerCount(livestreamId);
+    
+    // Update MongoDB with the current viewer count
+    await this.updateMongoViewerCount(livestreamId, count);
+    
+    return count;
   }
 
   /**
@@ -112,5 +129,23 @@ export class LivestreamViewerService {
     
     // Also clear in-memory
     this.memoryViewers.delete(livestreamId);
+    
+    // Reset MongoDB viewer count
+    await this.updateMongoViewerCount(livestreamId, 0);
+  }
+
+  /**
+   * Update the viewer count in MongoDB
+   * This allows the REST API stats endpoint to return accurate viewer counts
+   */
+  private async updateMongoViewerCount(livestreamId: string, count: number): Promise<void> {
+    try {
+      await this.livestreamModel.findByIdAndUpdate(livestreamId, {
+        viewerCount: count,
+      });
+    } catch (error) {
+      // Log error but don't throw - viewer tracking should continue even if MongoDB update fails
+      console.error(`Failed to update MongoDB viewer count for ${livestreamId}:`, error);
+    }
   }
 }
