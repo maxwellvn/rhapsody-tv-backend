@@ -1,13 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Notification, NotificationDocument, NotificationType } from './notification.schema';
+import { NotificationGateway } from './notification.gateway';
 
 @Injectable()
 export class NotificationService {
   constructor(
     @InjectModel(Notification.name)
     private notificationModel: Model<NotificationDocument>,
+    @Inject(forwardRef(() => NotificationGateway))
+    private notificationGateway: NotificationGateway,
   ) {}
 
   /**
@@ -27,10 +30,34 @@ export class NotificationService {
       commentId?: string;
     };
   }): Promise<NotificationDocument> {
-    return this.notificationModel.create({
+    const notification = await this.notificationModel.create({
       ...data,
       userId: new Types.ObjectId(data.userId),
     });
+
+    // Send real-time notification via WebSocket
+    const transformedNotification = {
+      id: notification._id.toString(),
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      thumbnail: notification.imageUrl,
+      isRead: notification.isRead,
+      createdAt: notification.createdAt,
+      videoId: notification.data?.videoId,
+      channelId: notification.data?.channelId,
+      programId: notification.data?.programId,
+      livestreamId: notification.data?.livestreamId,
+      commentId: notification.data?.commentId,
+    };
+
+    this.notificationGateway.sendNotificationToUser(data.userId, transformedNotification);
+
+    // Also send updated unread count
+    const unreadCount = await this.getUnreadCount(data.userId);
+    this.notificationGateway.sendUnreadCountToUser(data.userId, unreadCount);
+
+    return notification;
   }
 
   /**
@@ -109,6 +136,13 @@ export class NotificationService {
     if (!result) {
       throw new NotFoundException('Notification not found');
     }
+
+    // Send real-time update via WebSocket
+    this.notificationGateway.sendNotificationReadToUser(userId, notificationId);
+
+    // Send updated unread count
+    const unreadCount = await this.getUnreadCount(userId);
+    this.notificationGateway.sendUnreadCountToUser(userId, unreadCount);
   }
 
   /**
@@ -119,6 +153,10 @@ export class NotificationService {
       { userId: new Types.ObjectId(userId), isRead: false },
       { isRead: true },
     );
+
+    // Send real-time update via WebSocket
+    this.notificationGateway.sendAllNotificationsReadToUser(userId);
+    this.notificationGateway.sendUnreadCountToUser(userId, 0);
   }
 
   /**
@@ -137,6 +175,15 @@ export class NotificationService {
 
     if (!result) {
       throw new NotFoundException('Notification not found');
+    }
+
+    // Send real-time update via WebSocket
+    this.notificationGateway.sendNotificationDeletedToUser(userId, notificationId);
+
+    // Send updated unread count if the deleted notification was unread
+    if (!result.isRead) {
+      const unreadCount = await this.getUnreadCount(userId);
+      this.notificationGateway.sendUnreadCountToUser(userId, unreadCount);
     }
   }
 
