@@ -1,11 +1,12 @@
 import { Controller, Get, Post, Param, Query, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Public, CurrentUser } from '../../common/decorators';
 import { ApiOkSuccessResponse, ApiCreatedSuccessResponse } from '../../common/swagger';
 import { Channel, ChannelDocument } from './schemas/channel.schema';
 import { SubscriptionService } from './subscription.service';
+import { Video, VideoDocument } from '../stream/schemas/video.schema';
 import type { UserDocument } from '../user/schemas/user.schema';
 
 @ApiTags('Channels')
@@ -13,6 +14,7 @@ import type { UserDocument } from '../user/schemas/user.schema';
 export class ChannelController {
   constructor(
     @InjectModel(Channel.name) private channelModel: Model<ChannelDocument>,
+    @InjectModel(Video.name) private videoModel: Model<VideoDocument>,
     private readonly subscriptionService: SubscriptionService,
   ) {}
 
@@ -87,10 +89,29 @@ export class ChannelController {
       throw new NotFoundException('Channel not found');
     }
 
+    const channelId = channel._id.toString();
+
+    // Get video count for this channel
+    const videoCount = await this.videoModel.countDocuments({
+      channelId: channel._id,
+      isActive: true,
+      visibility: 'public',
+    });
+
+    // Get subscriber count
+    const subscriberCount = await this.subscriptionService.getSubscriberCount(channelId);
+
+    // Transform to plain object and add computed fields
+    const channelData = channel.toJSON();
+
     return {
       success: true,
       message: 'Channel retrieved successfully',
-      data: channel,
+      data: {
+        ...channelData,
+        videoCount,
+        subscriberCount,
+      },
     };
   }
 
@@ -111,10 +132,27 @@ export class ChannelController {
       throw new NotFoundException('Channel not found');
     }
 
+    // Get video count for this channel
+    const videoCount = await this.videoModel.countDocuments({
+      channelId: new Types.ObjectId(id),
+      isActive: true,
+      visibility: 'public',
+    });
+
+    // Get subscriber count
+    const subscriberCount = await this.subscriptionService.getSubscriberCount(id);
+
+    // Transform to plain object and add computed fields
+    const channelData = channel.toJSON();
+
     return {
       success: true,
       message: 'Channel retrieved successfully',
-      data: channel,
+      data: {
+        ...channelData,
+        videoCount,
+        subscriberCount,
+      },
     };
   }
 

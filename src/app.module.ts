@@ -20,6 +20,7 @@ import { JwtAuthGuard, RolesGuard } from './common/guards';
 // Shared
 import { RedisModule } from './shared/services/redis';
 import { ImageKitModule } from './shared/services/imagekit';
+import { VideoProbeModule } from './shared/services/video-probe';
 
 // Modules
 import { UserModule } from './modules/user';
@@ -53,6 +54,7 @@ import { HealthController } from './health.controller';
     // Shared Modules
     RedisModule,
     ImageKitModule,
+    VideoProbeModule,
 
     // Feature Modules
     AuthModule,

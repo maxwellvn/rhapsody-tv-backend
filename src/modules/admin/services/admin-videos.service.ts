@@ -1,20 +1,37 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Video, VideoDocument } from '../../stream/schemas/video.schema';
 import { CreateVideoDto, UpdateVideoDto } from '../dto/videos';
+import { VideoProbeService } from '../../../shared/services/video-probe';
 
 @Injectable()
 export class AdminVideosService {
+  private readonly logger = new Logger(AdminVideosService.name);
+
   constructor(
     @InjectModel(Video.name) private videoModel: Model<VideoDocument>,
+    private readonly videoProbeService: VideoProbeService,
   ) {}
 
   async create(dto: CreateVideoDto): Promise<VideoDocument> {
+    // Auto-calculate duration if not provided
+    let durationSeconds = dto.durationSeconds;
+    
+    if (!durationSeconds && dto.playbackUrl) {
+      this.logger.log(`Auto-calculating duration for: ${dto.playbackUrl}`);
+      const probedDuration = await this.videoProbeService.getDuration(dto.playbackUrl);
+      if (probedDuration) {
+        durationSeconds = probedDuration;
+        this.logger.log(`Auto-calculated duration: ${durationSeconds}s`);
+      }
+    }
+
     const video = new this.videoModel({
       ...dto,
       channelId: dto.channelId,
       programId: dto.programId,
+      durationSeconds,
     });
 
     return video.save();
@@ -72,7 +89,19 @@ export class AdminVideosService {
   }
 
   async update(id: string, dto: UpdateVideoDto): Promise<VideoDocument> {
-    const video = await this.videoModel.findByIdAndUpdate(id, dto, {
+    // If playbackUrl is being updated and duration isn't provided, auto-calculate it
+    let updateData: any = { ...dto };
+    
+    if (dto.playbackUrl && !dto.durationSeconds) {
+      this.logger.log(`Auto-calculating duration for updated URL: ${dto.playbackUrl}`);
+      const probedDuration = await this.videoProbeService.getDuration(dto.playbackUrl);
+      if (probedDuration) {
+        updateData.durationSeconds = probedDuration;
+        this.logger.log(`Auto-calculated duration: ${probedDuration}s`);
+      }
+    }
+
+    const video = await this.videoModel.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
     });

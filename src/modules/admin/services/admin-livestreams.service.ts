@@ -35,6 +35,8 @@ export class AdminLivestreamsService {
       programId: dto.programId || undefined,
       scheduleType,
       status: defaultStatus,
+      // Set startedAt if creating as LIVE
+      startedAt: defaultStatus === LiveStreamStatus.LIVE ? new Date() : undefined,
     });
 
     return livestream.save();
