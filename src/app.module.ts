@@ -26,6 +26,7 @@ import { AuthModule } from './modules/auth';
 import { AdminModule } from './modules/admin/admin.module';
 import { HomepageModule } from './modules/homepage';
 import { VodModule } from './modules/vod';
+import { ChannelModule } from './modules/channel';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { VodModule } from './modules/vod';
     AuthModule,
     UserModule,
     AdminModule,
+    ChannelModule,
     HomepageModule,
     VodModule,
   ],
