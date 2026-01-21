@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import {
   LiveStream,
   LiveStreamDocument,
@@ -31,8 +31,8 @@ export class AdminLivestreamsService {
 
     const livestream = new this.livestreamModel({
       ...dto,
-      channelId: dto.channelId,
-      programId: dto.programId || undefined,
+      channelId: new Types.ObjectId(dto.channelId),
+      programId: dto.programId ? new Types.ObjectId(dto.programId) : undefined,
       scheduleType,
       status: defaultStatus,
       // Set startedAt if creating as LIVE
