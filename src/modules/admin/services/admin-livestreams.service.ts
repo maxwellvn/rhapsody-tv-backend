@@ -87,16 +87,31 @@ export class AdminLivestreamsService {
     id: string,
     dto: UpdateLivestreamDto,
   ): Promise<LiveStreamDocument> {
-    const livestream = await this.livestreamModel.findByIdAndUpdate(id, dto, {
-      new: true,
-      runValidators: true,
-    });
-
-    if (!livestream) {
+    // First, get the existing livestream to check its state
+    const existing = await this.livestreamModel.findById(id);
+    if (!existing) {
       throw new NotFoundException('Livestream not found');
     }
 
-    return livestream;
+    // Build update data with ObjectId conversion
+    const updateData: Record<string, unknown> = { ...dto };
+    if (dto.programId) {
+      updateData.programId = new Types.ObjectId(dto.programId);
+    }
+
+    // If livestream is LIVE and doesn't have startedAt, set it
+    // Use createdAt from timestamps (available on document but not in type)
+    if (existing.status === LiveStreamStatus.LIVE && !existing.startedAt) {
+      updateData.startedAt = (existing as any).createdAt || new Date();
+    }
+
+    const livestream = await this.livestreamModel.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true },
+    );
+
+    return livestream!;
   }
 
   async updateStatus(
