@@ -11,12 +11,14 @@ import {
   UpdateLivestreamDto,
   UpdateLivestreamStatusDto,
 } from '../dto/livestreams';
+import { NotificationsService } from '../../notifications';
 
 @Injectable()
 export class AdminLivestreamsService {
   constructor(
     @InjectModel(LiveStream.name)
     private livestreamModel: Model<LiveStreamDocument>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(dto: CreateLivestreamDto): Promise<LiveStreamDocument> {
@@ -88,6 +90,11 @@ export class AdminLivestreamsService {
     id: string,
     dto: UpdateLivestreamStatusDto,
   ): Promise<LiveStreamDocument> {
+    const existing = await this.livestreamModel.findById(id);
+    if (!existing) {
+      throw new NotFoundException('Livestream not found');
+    }
+
     const updateData: Record<string, unknown> = { status: dto.status };
 
     if (dto.status === LiveStreamStatus.LIVE) {
@@ -104,6 +111,17 @@ export class AdminLivestreamsService {
 
     if (!livestream) {
       throw new NotFoundException('Livestream not found');
+    }
+
+    if (
+      dto.status === LiveStreamStatus.LIVE &&
+      existing.status !== LiveStreamStatus.LIVE
+    ) {
+      await this.notificationsService.notifyGoLive({
+        channelId: livestream.channelId.toString(),
+        livestreamId: livestream._id.toString(),
+        livestreamTitle: livestream.title,
+      });
     }
 
     return livestream;

@@ -10,9 +10,11 @@ import {
 import { CommentLike, CommentLikeSchema } from './schemas/comment-like.schema';
 import { VodController } from './vod.controller';
 import { VodService } from './vod.service';
+import { NotificationsModule } from '../notifications';
 
 @Module({
   imports: [
+    NotificationsModule,
     MongooseModule.forFeature([
       { name: Video.name, schema: VideoSchema },
       { name: Channel.name, schema: ChannelSchema },

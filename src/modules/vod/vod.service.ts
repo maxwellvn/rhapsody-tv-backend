@@ -17,6 +17,7 @@ import {
   CommentLikeDocument,
 } from './schemas/comment-like.schema';
 import { CreateCommentDto } from './dto';
+import { NotificationsService } from '../notifications';
 
 @Injectable()
 export class VodService {
@@ -31,6 +32,7 @@ export class VodService {
     private readonly commentLikeModel: Model<CommentLikeDocument>,
     @InjectModel(Channel.name)
     private readonly channelModel: Model<ChannelDocument>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -282,6 +284,14 @@ export class VodService {
       parentCommentId: new Types.ObjectId(commentId),
     });
 
+    await this.notificationsService.notifyCommentReplied({
+      recipientUserId: parentComment.userId.toString(),
+      actorUserId: userId,
+      commentId: parentComment._id.toString(),
+      replyId: reply._id.toString(),
+      videoId,
+    });
+
     // Increment comment count on video
     await this.videoModel.findByIdAndUpdate(videoId, {
       $inc: { commentCount: 1 },
@@ -357,6 +367,14 @@ export class VodService {
         userId: userObjectId,
         commentId: commentObjectId,
       });
+
+      await this.notificationsService.notifyCommentLiked({
+        recipientUserId: comment.userId.toString(),
+        actorUserId: userId,
+        commentId: comment._id.toString(),
+        videoId: comment.videoId.toString(),
+      });
+
       await this.videoCommentModel.findByIdAndUpdate(commentId, {
         $inc: { likeCount: 1 },
       });

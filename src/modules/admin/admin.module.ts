@@ -17,10 +17,12 @@ import { AdminChannelsService } from './services/admin-channels.service';
 import { AdminLivestreamsService } from './services/admin-livestreams.service';
 import { AdminVideosService } from './services/admin-videos.service';
 import { AdminProgramsService } from './services/admin-programs.service';
+import { NotificationsModule } from '../notifications';
 
 @Module({
   imports: [
     ImageKitModule,
+    NotificationsModule,
     MongooseModule.forFeature([
       { name: Channel.name, schema: ChannelSchema },
       { name: Program.name, schema: ProgramSchema },

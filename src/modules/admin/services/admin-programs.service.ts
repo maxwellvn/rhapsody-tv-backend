@@ -3,11 +3,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Program, ProgramDocument } from '../../channel/schemas/program.schema';
 import { CreateProgramDto, UpdateProgramDto } from '../dto/programs';
+import { NotificationsService } from '../../notifications';
 
 @Injectable()
 export class AdminProgramsService {
   constructor(
     @InjectModel(Program.name) private programModel: Model<ProgramDocument>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(dto: CreateProgramDto): Promise<ProgramDocument> {
@@ -26,7 +28,18 @@ export class AdminProgramsService {
       durationInMinutes,
     });
 
-    return program.save();
+    const saved = await program.save();
+
+    if (saved.isActive) {
+      await this.notificationsService.notifyNewProgram({
+        channelId: saved.channelId.toString(),
+        programId: saved._id.toString(),
+        programTitle: saved.title,
+        startTime: saved.startTime.toISOString(),
+      });
+    }
+
+    return saved;
   }
 
   async findAll(

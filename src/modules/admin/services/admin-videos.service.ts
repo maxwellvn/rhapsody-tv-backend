@@ -1,13 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Video, VideoDocument } from '../../stream/schemas/video.schema';
+import {
+  Video,
+  VideoDocument,
+  VideoVisibility,
+} from '../../stream/schemas/video.schema';
 import { CreateVideoDto, UpdateVideoDto } from '../dto/videos';
+import { NotificationsService } from '../../notifications';
 
 @Injectable()
 export class AdminVideosService {
   constructor(
     @InjectModel(Video.name) private videoModel: Model<VideoDocument>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(dto: CreateVideoDto): Promise<VideoDocument> {
@@ -16,7 +22,17 @@ export class AdminVideosService {
       channelId: dto.channelId,
     });
 
-    return video.save();
+    const saved = await video.save();
+
+    if (saved.isActive && saved.visibility === VideoVisibility.PUBLIC) {
+      await this.notificationsService.notifyNewVideo({
+        channelId: saved.channelId.toString(),
+        videoId: saved._id.toString(),
+        videoTitle: saved.title,
+      });
+    }
+
+    return saved;
   }
 
   async findAll(
