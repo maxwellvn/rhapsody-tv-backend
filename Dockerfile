@@ -1,7 +1,32 @@
 # syntax = docker/dockerfile:1
 
-# Build stage
-FROM node:20-alpine AS builder
+# ============================================
+# Stage 1: Build Admin App (React/Vite)
+# ============================================
+FROM node:20-alpine AS admin-builder
+
+WORKDIR /app/admin-app
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Copy admin-app package files
+COPY admin-app/package.json admin-app/pnpm-lock.yaml ./
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy admin-app source
+COPY admin-app/ ./
+
+# Build admin app for production
+RUN pnpm run build
+
+
+# ============================================
+# Stage 2: Build Backend (NestJS)
+# ============================================
+FROM node:20-alpine AS backend-builder
 
 WORKDIR /app
 
@@ -14,8 +39,9 @@ COPY package.json pnpm-lock.yaml ./
 # Install all dependencies (including dev for building)
 RUN pnpm install --frozen-lockfile
 
-# Copy source code
+# Copy source code (exclude admin-app)
 COPY . .
+RUN rm -rf admin-app
 
 # Build the application
 RUN pnpm run build
@@ -24,7 +50,9 @@ RUN pnpm run build
 RUN pnpm prune --prod
 
 
-# Production stage
+# ============================================
+# Stage 3: Production
+# ============================================
 FROM node:20-alpine AS production
 
 WORKDIR /app
@@ -36,10 +64,13 @@ RUN npm install -g pnpm
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nestjs
 
-# Copy built application from builder
-COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nestjs:nodejs /app/package.json ./
+# Copy built backend from builder
+COPY --from=backend-builder --chown=nestjs:nodejs /app/dist ./dist
+COPY --from=backend-builder --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=backend-builder --chown=nestjs:nodejs /app/package.json ./
+
+# Copy built admin app to public/admin directory
+COPY --from=admin-builder --chown=nestjs:nodejs /app/admin-app/dist ./public/admin
 
 # Set environment variables
 ENV NODE_ENV=production

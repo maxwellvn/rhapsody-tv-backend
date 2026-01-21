@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ServeStaticModule } from '@nestjs/serve-static';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { join } from 'path';
 
 // Config
 import {
@@ -31,6 +33,7 @@ import { NotificationModule } from './modules/notification/notification.module';
 
 // Controllers
 import { HealthController } from './health.controller';
+import { AdminSpaController } from './admin-spa.controller';
 
 @Module({
   imports: [
@@ -39,6 +42,16 @@ import { HealthController } from './health.controller';
       isGlobal: true,
       load: [appConfig, databaseConfig, redisConfig, jwtConfig, imagekitConfig, emailConfig],
       envFilePath: ['.env', '.env.local'],
+    }),
+
+    // Serve Admin App static files
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'public', 'admin'),
+      serveRoot: '/admin',
+      serveStaticOptions: {
+        index: ['index.html'],
+        fallthrough: true,
+      },
     }),
 
     // Database
@@ -62,7 +75,7 @@ import { HealthController } from './health.controller';
     VodModule,
     NotificationModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, AdminSpaController],
   providers: [
     // Global Exception Filter
     {
