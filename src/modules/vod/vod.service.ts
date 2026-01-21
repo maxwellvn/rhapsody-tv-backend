@@ -47,11 +47,11 @@ export class VodService {
     const skip = (page - 1) * limit;
     const filter: Record<string, any> = { isActive: true, visibility: 'public' };
     
-    if (programId) {
+    if (programId && Types.ObjectId.isValid(programId)) {
       filter.programId = new Types.ObjectId(programId);
     }
     
-    if (channelId) {
+    if (channelId && Types.ObjectId.isValid(channelId)) {
       filter.channelId = new Types.ObjectId(channelId);
     }
 
