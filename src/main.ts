@@ -13,8 +13,15 @@ async function bootstrap() {
   const port = configService.get<number>('app.port', 3000);
   const nodeEnv = configService.get<string>('app.nodeEnv', 'development');
 
-  // Security
-  app.use(helmet());
+  // Security - configure helmet to work with admin SPA
+  app.use(
+    helmet({
+      contentSecurityPolicy: false, // Disable CSP for admin app compatibility
+      crossOriginEmbedderPolicy: false,
+      crossOriginOpenerPolicy: false,
+      crossOriginResourcePolicy: false,
+    }),
+  );
 
   // CORS
   app.enableCors({
@@ -27,8 +34,10 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
-  // Global prefix
-  app.setGlobalPrefix('v1');
+  // Global prefix - exclude admin and health routes
+  app.setGlobalPrefix('v1', {
+    exclude: ['health', 'admin', 'admin/(.*)'],
+  });
 
   // Validation
   app.useGlobalPipes(
