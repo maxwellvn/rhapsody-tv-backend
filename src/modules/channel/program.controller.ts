@@ -1,18 +1,20 @@
 import { Controller, Get, Post, Param, Query, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Public, CurrentUser } from '../../common/decorators';
 import { ApiOkSuccessResponse, ApiCreatedSuccessResponse } from '../../common/swagger';
 import { Program, ProgramDocument } from './schemas/program.schema';
 import { ProgramSubscriptionService } from './program-subscription.service';
 import type { UserDocument } from '../user/schemas/user.schema';
+import { Video, VideoDocument } from '../stream/schemas/video.schema';
 
 @ApiTags('Programs')
 @Controller('programs')
 export class ProgramController {
   constructor(
     @InjectModel(Program.name) private programModel: Model<ProgramDocument>,
+    @InjectModel(Video.name) private videoModel: Model<VideoDocument>,
     private readonly programSubscriptionService: ProgramSubscriptionService,
   ) {}
 
@@ -97,10 +99,29 @@ export class ProgramController {
       throw new NotFoundException('Program not found');
     }
 
+    // Get video count for this program
+    const videoCount = await this.videoModel.countDocuments({
+      programId: new Types.ObjectId(id),
+      isActive: true,
+      visibility: 'public',
+    });
+
+    // Get subscriber count for this program
+    const subscriberCount = await this.programSubscriptionService.getSubscriberCount(id);
+
+    // Transform to plain object and add computed fields
+    const programData = program.toJSON();
+
     return {
       success: true,
       message: 'Program retrieved successfully',
-      data: program,
+      data: {
+        ...programData,
+        videoCount,
+        subscriberCount,
+        // Map channelId to channel for frontend consistency
+        channel: programData.channelId,
+      },
     };
   }
 

@@ -4,6 +4,7 @@ import { Channel, ChannelSchema } from './schemas/channel.schema';
 import { Program, ProgramSchema } from './schemas/program.schema';
 import { Subscription, SubscriptionSchema } from './schemas/subscription.schema';
 import { ProgramSubscription, ProgramSubscriptionSchema } from './schemas/program-subscription.schema';
+import { Video, VideoSchema } from '../stream/schemas/video.schema';
 import { ChannelController } from './channel.controller';
 import { ProgramController } from './program.controller';
 import { SubscriptionService } from './subscription.service';
@@ -16,6 +17,7 @@ import { ProgramSubscriptionService } from './program-subscription.service';
       { name: Program.name, schema: ProgramSchema },
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: ProgramSubscription.name, schema: ProgramSubscriptionSchema },
+      { name: Video.name, schema: VideoSchema },
     ]),
   ],
   controllers: [ChannelController, ProgramController],
