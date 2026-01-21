@@ -20,7 +20,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import MainLayout from '@/components/layout/MainLayout';
 import { channelService } from '@/services/api/channel.service';
 import { programService } from '@/services/api/program.service';
-import { apiClient } from '@/services/api/client';
+import apiClient from '@/services/api/client';
 import { ROUTES } from '@/utils/constants';
 import { formatDateTime } from '@/utils/helpers';
 
