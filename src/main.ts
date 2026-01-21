@@ -2,15 +2,17 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { join } from 'path';
-import * as express from 'express';
+import { static as expressStatic } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { existsSync } from 'fs';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port', 3000);
@@ -30,10 +32,10 @@ async function bootstrap() {
   const adminPath = join(__dirname, '..', 'public', 'admin');
   if (existsSync(adminPath)) {
     // Serve static assets
-    app.use('/admin', express.static(adminPath));
+    app.use('/admin', expressStatic(adminPath));
     
     // SPA fallback - serve index.html for all /admin/* routes that don't match a file
-    app.use('/admin/*', (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    app.use('/admin/*', (req: Request, res: Response, next: NextFunction) => {
       const indexPath = join(adminPath, 'index.html');
       if (existsSync(indexPath)) {
         res.sendFile(indexPath);
