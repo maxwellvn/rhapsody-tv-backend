@@ -293,6 +293,7 @@ export class AuthService {
         fullName: user.fullName,
         roles: user.roles,
         isEmailVerified: user.isEmailVerified,
+        kingschatId: user.kingschatId,
         kingschatUsername: user.kingschatUsername,
         avatar: user.avatar,
       },
@@ -301,6 +302,7 @@ export class AuthService {
 
     this.logger.log('[KingsChat] Returning auth response:', {
       userId: result.user.id,
+      kingschatId: result.user.kingschatId,
       email: result.user.email,
       fullName: result.user.fullName,
     });
