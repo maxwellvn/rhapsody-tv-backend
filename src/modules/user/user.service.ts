@@ -89,7 +89,7 @@ export class UserService {
   }
 
   async findByKingschatUsernameOrEmail(
-    kingschatUsername: string,
+    username: string,
     email?: string,
   ): Promise<UserDocument | null> {
     // Build conditions - we need to be EXPLICIT to avoid matching documents
@@ -97,16 +97,16 @@ export class UserService {
     const conditions: Array<Record<string, unknown>> = [];
 
     // Only match if kingschatUsername is explicitly set to this value (not null/undefined/empty)
-    conditions.push({
-      kingschatUsername: { $eq: kingschatUsername, $exists: true, $ne: null, $ne: '' }
-    });
+    const kcCondition: Record<string, unknown> = {};
+    kcCondition.kingschatUsername = username;
+    conditions.push(kcCondition);
 
     if (email) {
       conditions.push({ email: email.toLowerCase() });
     }
 
     console.log('[UserService] findByKingschatUsernameOrEmail query:', {
-      kingschatUsername,
+      kingschatUsername: username,
       email,
       conditions,
     });
