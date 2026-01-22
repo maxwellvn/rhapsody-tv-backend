@@ -246,7 +246,7 @@ export class VodService {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('userId', 'fullName')
+        .populate('userId', 'fullName avatar')
         .exec(),
       this.videoCommentModel.countDocuments({
         videoId: videoObjectId,
@@ -263,7 +263,7 @@ export class VodService {
         isDeleted: false,
       })
       .sort({ createdAt: 1 })
-      .populate('userId', 'fullName')
+      .populate('userId', 'fullName avatar')
       .exec();
 
     // Group replies by parent comment
@@ -318,7 +318,7 @@ export class VodService {
     });
 
     // Populate user info
-    await comment.populate('userId', 'fullName');
+    await comment.populate('userId', 'fullName avatar');
 
     return this.formatCommentResponse(comment);
   }
@@ -372,7 +372,7 @@ export class VodService {
     });
 
     // Populate user info
-    await reply.populate('userId', 'fullName');
+    await reply.populate('userId', 'fullName avatar');
 
     return this.formatCommentResponse(reply);
   }
@@ -506,17 +506,42 @@ export class VodService {
    * Format comment response
    */
   private formatCommentResponse(comment: VideoCommentDocument) {
+    // Handle both populated and non-populated userId
     const userData = comment.userId as unknown as {
-      _id: Types.ObjectId;
-      fullName: string;
-    };
+      _id?: Types.ObjectId;
+      fullName?: string;
+      avatar?: string;
+    } | null;
+    
+    // Safely get user ID - could be ObjectId or populated object
+    let userId: string;
+    let fullName: string;
+    let avatar: string | undefined;
+    
+    if (userData && typeof userData === 'object' && '_id' in userData) {
+      // Populated user object
+      userId = userData._id?.toString() || '';
+      fullName = userData.fullName || 'Unknown User';
+      avatar = userData.avatar;
+    } else if (comment.userId) {
+      // Non-populated ObjectId
+      userId = comment.userId.toString();
+      fullName = 'Unknown User';
+      avatar = undefined;
+    } else {
+      userId = '';
+      fullName = 'Unknown User';
+      avatar = undefined;
+    }
+    
     return {
       id: comment._id.toString(),
       videoId: comment.videoId.toString(),
       message: comment.message,
       user: {
-        id: userData?._id?.toString() || comment.userId.toString(),
-        fullName: userData?.fullName || 'Unknown User',
+        id: userId,
+        fullName,
+        avatar,
       },
       parentCommentId: comment.parentCommentId?.toString(),
       likeCount: comment.likeCount || 0,
