@@ -43,7 +43,7 @@ async function bootstrap() {
   );
 
   // Swagger Documentation
-  // if (nodeEnv !== 'production') {
+  if (nodeEnv !== 'production') {
     const config = new DocumentBuilder()
       .setTitle('Rhapsody TV API')
       .setDescription('Rhapsody TV Backend API Documentation')
@@ -63,7 +63,7 @@ async function bootstrap() {
     logger.log(
       `Swagger documentation available at http://localhost:${port}/v1/docs`,
     );
-  // }
+  }
 
   await app.listen(port, '0.0.0.0');
   logger.log(`Application is running on: http://localhost:${port}`);
