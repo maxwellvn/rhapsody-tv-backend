@@ -211,6 +211,21 @@ export class AuthService {
   /**
    * Authenticate user with KingsChat OAuth token
    * Fetches user profile from KingsChat API and creates/updates user
+   * 
+   * KingsChat API Response Format (from https://connect.kingsch.at/api/profile):
+   * {
+   *   "profile": {
+   *     "user": {
+   *       "user_id": "string",
+   *       "username": "string",
+   *       "name": "string",
+   *       "avatar": "string (URL)"
+   *     },
+   *     "email": {
+   *       "address": "string"
+   *     }
+   *   }
+   * }
    */
   async loginWithKingschat(accessToken: string) {
     // Fetch user profile from KingsChat API
@@ -226,7 +241,7 @@ export class AuthService {
       last_name?: string;
       display_name?: string;
       avatar?: string;
-      country?: string;
+      phone?: string;
     };
 
     try {
@@ -253,38 +268,79 @@ export class AuthService {
       }
 
       const responseText = await response.text();
-      this.logger.log('[KingsChat] Raw API Response:', responseText.substring(0, 500));
+      this.logger.log('[KingsChat] Raw API Response:', responseText.substring(0, 1000));
 
       const rawProfile = JSON.parse(responseText);
       
       // Log full raw response to see actual field names
       this.logger.log('[KingsChat] Full raw profile:', JSON.stringify(rawProfile));
 
-      // KingsChat API may return data in different formats - handle both
-      // The profile might be nested under a 'data' or 'user' key
-      const profileData = rawProfile.data || rawProfile.user || rawProfile;
+      // KingsChat API returns nested structure: { profile: { user: {...}, email: { address: "..." } } }
+      // Handle multiple possible response formats for compatibility
+      const profileWrapper = rawProfile.profile || rawProfile.data || rawProfile;
+      const userData = profileWrapper.user || profileWrapper;
       
-      // Map to our expected format - try multiple possible field names
+      // Extract user ID - KingsChat uses 'user_id' in nested format
+      const userId = userData.user_id || userData.id || userData.userId || userData.kingschat_id;
+      
+      // Extract username
+      const username = userData.username || userData.user_name || userData.userName || userId;
+      
+      // Extract email - KingsChat nests email at profile.email.address
+      const email = profileWrapper.email?.address || 
+                    userData.email?.address ||
+                    userData.email || 
+                    profileWrapper.email_address;
+      
+      // Extract display name
+      const displayName = userData.name || 
+                          userData.display_name || 
+                          userData.displayName || 
+                          userData.full_name || 
+                          userData.fullName;
+      
+      // Extract avatar
+      const avatar = userData.avatar || 
+                     userData.avatar_url || 
+                     userData.avatarUrl || 
+                     userData.profile_picture || 
+                     userData.picture;
+      
+      // Extract phone if available
+      const phone = userData.phone || userData.phone_number;
+      
+      // Map to our expected format
       kingsChatProfile = {
-        id: profileData.id || profileData.user_id || profileData.userId || profileData.kingschat_id,
-        username: profileData.username || profileData.user_name || profileData.userName,
-        email: profileData.email || profileData.email_address,
-        first_name: profileData.first_name || profileData.firstName || profileData.given_name,
-        last_name: profileData.last_name || profileData.lastName || profileData.family_name,
-        display_name: profileData.display_name || profileData.displayName || profileData.name || profileData.full_name || profileData.fullName,
-        avatar: profileData.avatar || profileData.avatar_url || profileData.avatarUrl || profileData.profile_picture || profileData.picture,
+        id: userId,
+        username: username,
+        email: email,
+        first_name: userData.first_name || userData.firstName || userData.given_name,
+        last_name: userData.last_name || userData.lastName || userData.family_name,
+        display_name: displayName,
+        avatar: avatar,
+        phone: phone,
       };
 
       // Log KingsChat profile for debugging
-      this.logger.log('[KingsChat] Profile fetched:', {
+      this.logger.log('[KingsChat] Profile parsed:', {
         id: kingsChatProfile.id,
         username: kingsChatProfile.username,
         email: kingsChatProfile.email,
         displayName: kingsChatProfile.display_name,
         firstName: kingsChatProfile.first_name,
         lastName: kingsChatProfile.last_name,
+        avatar: kingsChatProfile.avatar,
       });
+      
+      // Validate we have required fields
+      if (!kingsChatProfile.id && !kingsChatProfile.username) {
+        this.logger.error('[KingsChat] Missing required user identifier in response');
+        throw new UnauthorizedException('Could not retrieve KingsChat user information');
+      }
     } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       this.logger.error('KingsChat API error:', error);
       throw new UnauthorizedException('Failed to authenticate with KingsChat');
     }

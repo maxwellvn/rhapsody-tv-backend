@@ -80,37 +80,100 @@ export class KingsChatCallbackController {
       params.append('status', 'error');
       params.append('error', error);
     } else if (accessToken) {
+      params.append('status', 'success');
       params.append('accessToken', accessToken);
       if (refreshToken) {
         params.append('refreshToken', refreshToken);
       }
+    } else {
+      // No token received
+      params.append('status', 'error');
+      params.append('error', 'No token received');
     }
 
     if (params.toString()) {
       deepLink += `?${params.toString()}`;
     }
 
-    const html = this.buildRedirectHtml(deepLink, !!error);
+    const html = this.buildRedirectHtml(deepLink, !!error || !accessToken);
 
     return res.status(200).type('html').send(html);
   }
 
   /**
-   * Build HTML page for redirect
+   * Build HTML page for redirect with fallback button
    */
   private buildRedirectHtml(deepLink: string, isError: boolean): string {
+    const title = isError ? 'Authentication Failed' : 'Authentication Successful';
+    const message = isError 
+      ? 'There was a problem signing in. Please try again.'
+      : 'Redirecting you back to the app...';
+    
     return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Redirecting...</title>
+  <title>${title}</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+      color: white;
+    }
+    .container {
+      text-align: center;
+      padding: 40px;
+    }
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(255,255,255,0.3);
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    h2 { margin-bottom: 10px; }
+    p { color: rgba(255,255,255,0.7); }
+    .btn {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 12px 30px;
+      background: #3b82f6;
+      color: white;
+      text-decoration: none;
+      border-radius: 25px;
+      font-weight: 600;
+    }
+  </style>
 </head>
 <body>
+  <div class="container">
+    ${!isError ? '<div class="spinner"></div>' : ''}
+    <h2>${title}</h2>
+    <p>${message}</p>
+    <a href="${deepLink}" class="btn">
+      ${isError ? 'Try Again' : 'Open App'}
+    </a>
+  </div>
   <script>
-    // Immediate redirect - execute before page renders
-    window.location.replace("${deepLink}");
+    // Auto-redirect to the app
+    window.location.href = ${JSON.stringify(deepLink)};
+    
+    // Fallback: try again after a short delay
+    setTimeout(function() {
+      window.location.href = ${JSON.stringify(deepLink)};
+    }, 1000);
   </script>
 </body>
 </html>
