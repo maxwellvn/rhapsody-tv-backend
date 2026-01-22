@@ -76,15 +76,30 @@ export class UserService {
     return this.userModel.findOne({ kingschatUsername });
   }
 
+  async findByKingschatId(kingschatId: string): Promise<UserDocument | null> {
+    console.log('[UserService] findByKingschatId:', { kingschatId });
+    const result = await this.userModel.findOne({ kingschatId });
+    console.log('[UserService] findByKingschatId result:', result ? {
+      id: result._id.toString(),
+      email: result.email,
+      kingschatId: result.kingschatId,
+      kingschatUsername: result.kingschatUsername,
+    } : null);
+    return result;
+  }
+
   async findByKingschatUsernameOrEmail(
     kingschatUsername: string,
     email?: string,
   ): Promise<UserDocument | null> {
-    // Build conditions with explicit null/empty checks to avoid matching documents
-    // where kingschatUsername is null/undefined/empty
-    const conditions: Array<Record<string, unknown>> = [
-      { kingschatUsername: { $eq: kingschatUsername } },
-    ];
+    // Build conditions - we need to be EXPLICIT to avoid matching documents
+    // where kingschatUsername is null/undefined/empty string
+    const conditions: Array<Record<string, unknown>> = [];
+
+    // Only match if kingschatUsername is explicitly set to this value (not null/undefined/empty)
+    conditions.push({
+      kingschatUsername: { $eq: kingschatUsername, $exists: true, $ne: null, $ne: '' }
+    });
 
     if (email) {
       conditions.push({ email: email.toLowerCase() });
@@ -109,25 +124,34 @@ export class UserService {
   }
 
   async createFromKingschat(data: {
+    kingschatId: string;  // KingsChat's unique user ID
     email: string;
     fullName: string;
     kingschatUsername: string;
     avatar?: string;
   }): Promise<UserDocument> {
     console.log('[UserService] createFromKingschat called with:', {
+      kingschatId: data.kingschatId,
       kingschatUsername: data.kingschatUsername,
       email: data.email,
       fullName: data.fullName,
     });
 
-    const existingUser = await this.findByKingschatUsernameOrEmail(
-      data.kingschatUsername,
-      data.email,
-    );
+    // FIRST: Try to find by KingsChat ID (most reliable)
+    let existingUser = await this.findByKingschatId(data.kingschatId);
+
+    // SECOND: If not found by ID, try by username/email (legacy support)
+    if (!existingUser) {
+      existingUser = await this.findByKingschatUsernameOrEmail(
+        data.kingschatUsername,
+        data.email,
+      );
+    }
 
     console.log('[UserService] Existing user found:', existingUser ? {
       id: existingUser._id.toString(),
       email: existingUser.email,
+      kingschatId: existingUser.kingschatId,
       kingschatUsername: existingUser.kingschatUsername,
       fullName: existingUser.fullName,
     } : null);
@@ -135,6 +159,9 @@ export class UserService {
     if (existingUser) {
       // Update existing user with KingsChat data if missing
       const updates: Partial<Record<string, unknown>> = {};
+      if (!existingUser.kingschatId) {
+        updates.kingschatId = data.kingschatId;
+      }
       if (!existingUser.kingschatUsername) {
         updates.kingschatUsername = data.kingschatUsername;
       }
@@ -143,6 +170,7 @@ export class UserService {
       }
       if (Object.keys(updates).length > 0) {
         await this.userModel.findByIdAndUpdate(existingUser._id, updates);
+        console.log('[UserService] Updated existing user with:', updates);
       }
       console.log('[UserService] Returning existing user');
       return existingUser;
@@ -159,6 +187,7 @@ export class UserService {
     const user = new this.userModel({
       email: data.email.toLowerCase(),
       fullName: data.fullName,
+      kingschatId: data.kingschatId,
       kingschatUsername: data.kingschatUsername,
       avatar: data.avatar,
       password: randomPassword,
@@ -170,6 +199,7 @@ export class UserService {
     console.log('[UserService] New user created:', {
       id: savedUser._id.toString(),
       email: savedUser.email,
+      kingschatId: savedUser.kingschatId,
       kingschatUsername: savedUser.kingschatUsername,
     });
 

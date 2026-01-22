@@ -250,12 +250,14 @@ export class AuthService {
       kingsChatProfile.username;
 
     this.logger.log('[KingsChat] Looking up/creating user:', {
+      kingschatId: kingsChatProfile.id,
       kingschatUsername: kingsChatProfile.username,
       email: kingsChatProfile.email || `${kingsChatProfile.username}@kingschat.user`,
       fullName,
     });
 
     const user = await this.userService.createFromKingschat({
+      kingschatId: kingsChatProfile.id,  // Use KingsChat's unique ID
       email:
         kingsChatProfile.email ||
         `${kingsChatProfile.username}@kingschat.user`,

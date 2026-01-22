@@ -31,6 +31,9 @@ export class User {
   lastLoginAt?: Date;
 
   @Prop()
+  kingschatId?: string;  // KingsChat's unique user ID
+
+  @Prop()
   kingschatUsername?: string;
 
   @Prop()
@@ -41,7 +44,8 @@ export const UserSchema = SchemaFactory.createForClass(User);
 
 // Indexes
 UserSchema.index({ email: 1 }, { unique: true });
-UserSchema.index({ kingschatUsername: 1 }, { sparse: true, unique: true });
+UserSchema.index({ kingschatId: 1 }, { sparse: true, unique: true });  // Primary identifier for KingsChat users
+UserSchema.index({ kingschatUsername: 1 }, { sparse: true });
 UserSchema.index({ roles: 1 });
 UserSchema.index({ createdAt: -1 });
 
