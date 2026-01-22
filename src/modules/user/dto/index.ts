@@ -5,3 +5,5 @@ export * from './user-response.dto';
 export * from './paginated-users-response.dto';
 export * from './watchlist.dto';
 export * from './watch-history.dto';
+
+export * from './user-settings.dto';

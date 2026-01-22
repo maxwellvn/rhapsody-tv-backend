@@ -6,9 +6,40 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
-import { User, UserDocument } from './schemas/user.schema';
+import { User, UserDocument, type UserSettings } from './schemas/user.schema';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateUserSettingsDto } from './dto/user-settings.dto';
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+type DeepPartial<T extends object> = {
+  [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
+};
+
+function deepMerge<T extends object>(base: T, patch: DeepPartial<T>): T {
+  const result = { ...(base as object) } as T;
+
+  for (const key of Object.keys(patch ?? {}) as Array<keyof T>) {
+    const value = patch[key];
+    if (value === undefined) continue;
+
+    const existing = result[key];
+
+    if (isPlainObject(existing) && isPlainObject(value)) {
+      const existingObj: Record<string, unknown> = existing;
+      const valueObj: Record<string, unknown> = value;
+      const merged = deepMerge(existingObj, valueObj);
+      result[key] = merged as unknown as T[typeof key];
+    } else {
+      result[key] = value as unknown as T[typeof key];
+    }
+  }
+
+  return result;
+}
 
 @Injectable()
 export class UserService {
@@ -132,5 +163,42 @@ export class UserService {
     }
 
     return bcrypt.compare(refreshToken, user.refreshToken);
+  }
+
+  async getSettings(userId: string): Promise<UserSettings> {
+    const user = await this.userModel.findById(userId).select('settings');
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user.settings;
+  }
+
+  async updateSettings(
+    userId: string,
+    dto: UpdateUserSettingsDto,
+  ): Promise<UserSettings> {
+    const user = await this.userModel.findById(userId).select('settings');
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const merged = deepMerge(user.settings, dto);
+
+    const updated = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        { settings: merged },
+        { new: true, runValidators: true },
+      )
+      .select('settings');
+
+    if (!updated) {
+      throw new NotFoundException('User not found');
+    }
+
+    return updated.settings;
   }
 }

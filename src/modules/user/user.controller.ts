@@ -26,6 +26,8 @@ import {
   AddToWatchlistDto,
   PaginatedWatchlistResponseDto,
   PaginatedWatchHistoryResponseDto,
+  UserSettingsResponseDto,
+  UpdateUserSettingsDto,
 } from './dto';
 import { Roles, CurrentUser } from '../../common/decorators';
 import { Role } from '../../shared/enums/role.enum';
@@ -137,6 +139,39 @@ export class UserController {
       success: true,
       message: 'Profile updated successfully',
       data: updatedUser,
+    };
+  }
+
+  @Get('me/settings')
+  @ApiOperation({ summary: 'Get current user settings' })
+  @ApiOkSuccessResponse({
+    description: 'Settings retrieved successfully',
+    model: UserSettingsResponseDto,
+  })
+  async getSettings(@CurrentUser('sub') userId: string) {
+    const data = await this.userService.getSettings(userId);
+    return {
+      success: true,
+      message: 'Settings retrieved successfully',
+      data,
+    };
+  }
+
+  @Patch('me/settings')
+  @ApiOperation({ summary: 'Update current user settings' })
+  @ApiOkSuccessResponse({
+    description: 'Settings updated successfully',
+    model: UserSettingsResponseDto,
+  })
+  async updateSettings(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: UpdateUserSettingsDto,
+  ) {
+    const data = await this.userService.updateSettings(userId, dto);
+    return {
+      success: true,
+      message: 'Settings updated successfully',
+      data,
     };
   }
 

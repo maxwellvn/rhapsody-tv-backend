@@ -4,6 +4,48 @@ import { Role } from '../../../shared/enums/role.enum';
 
 export type UserDocument = HydratedDocument<User>;
 
+export type UserSettings = {
+  general: {
+    appLanguage: string;
+    autoRotateScreen: boolean;
+  };
+  notifications: {
+    subscriptions: boolean;
+    recommendedVideos: boolean;
+    activityOnMyComments: boolean;
+  };
+  quality: {
+    videoQualityMobile: string;
+    videoQualityWifi: string;
+    audioQuality: string;
+  };
+  downloads: {
+    downloadQuality: string;
+    downloadOverWifiOnly: boolean;
+  };
+};
+
+const defaultUserSettings: UserSettings = {
+  general: {
+    appLanguage: 'en',
+    autoRotateScreen: false,
+  },
+  notifications: {
+    subscriptions: true,
+    recommendedVideos: true,
+    activityOnMyComments: true,
+  },
+  quality: {
+    videoQualityMobile: 'auto',
+    videoQualityWifi: 'auto',
+    audioQuality: 'auto',
+  },
+  downloads: {
+    downloadQuality: 'medium',
+    downloadOverWifiOnly: false,
+  },
+};
+
 @Schema({ timestamps: true })
 export class User {
   @Prop({ required: true, trim: true })
@@ -29,6 +71,61 @@ export class User {
 
   @Prop()
   lastLoginAt?: Date;
+
+  @Prop({
+    type: {
+      general: {
+        appLanguage: {
+          type: String,
+          default: defaultUserSettings.general.appLanguage,
+        },
+        autoRotateScreen: {
+          type: Boolean,
+          default: defaultUserSettings.general.autoRotateScreen,
+        },
+      },
+      notifications: {
+        subscriptions: {
+          type: Boolean,
+          default: defaultUserSettings.notifications.subscriptions,
+        },
+        recommendedVideos: {
+          type: Boolean,
+          default: defaultUserSettings.notifications.recommendedVideos,
+        },
+        activityOnMyComments: {
+          type: Boolean,
+          default: defaultUserSettings.notifications.activityOnMyComments,
+        },
+      },
+      quality: {
+        videoQualityMobile: {
+          type: String,
+          default: defaultUserSettings.quality.videoQualityMobile,
+        },
+        videoQualityWifi: {
+          type: String,
+          default: defaultUserSettings.quality.videoQualityWifi,
+        },
+        audioQuality: {
+          type: String,
+          default: defaultUserSettings.quality.audioQuality,
+        },
+      },
+      downloads: {
+        downloadQuality: {
+          type: String,
+          default: defaultUserSettings.downloads.downloadQuality,
+        },
+        downloadOverWifiOnly: {
+          type: Boolean,
+          default: defaultUserSettings.downloads.downloadOverWifiOnly,
+        },
+      },
+    },
+    default: defaultUserSettings,
+  })
+  settings: UserSettings;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
