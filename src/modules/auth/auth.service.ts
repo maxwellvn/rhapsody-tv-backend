@@ -296,15 +296,17 @@ export class AuthService {
       const data = await response.json();
       this.logger.log(`KingsChat profile data: ${JSON.stringify(data)}`);
 
-      // KingsChat returns profile in various formats, handle all cases
-      const profile = data.profile || data.user || data;
+      // KingsChat returns profile in nested format: { profile: { user: {...}, email: {...} } }
+      const profileData = data.profile || data;
+      const user = profileData.user || profileData;
+      const emailData = profileData.email || {};
 
       return {
-        id: profile.user_id || profile.id || profile.userId,
-        username: profile.username || profile.user_name,
-        displayName: profile.display_name || profile.displayName || profile.name || profile.full_name || profile.username,
-        email: profile.email,
-        avatar: profile.avatar || profile.profile_picture || profile.profilePicture || profile.image,
+        id: user.user_id || user.id || user.userId,
+        username: user.username || user.user_name,
+        displayName: user.name || user.display_name || user.displayName || user.full_name || user.username,
+        email: typeof emailData === 'object' ? emailData.address : emailData,
+        avatar: user.avatar_url || user.avatar || user.profile_picture || user.profilePicture || user.image,
       };
     } catch (error) {
       this.logger.error('Failed to fetch KingsChat profile:', error);
