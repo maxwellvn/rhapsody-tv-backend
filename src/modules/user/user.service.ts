@@ -80,15 +80,32 @@ export class UserService {
     kingschatUsername: string,
     email?: string,
   ): Promise<UserDocument | null> {
-    const conditions: Array<Record<string, string>> = [
-      { kingschatUsername },
+    // Build conditions with explicit null/empty checks to avoid matching documents
+    // where kingschatUsername is null/undefined/empty
+    const conditions: Array<Record<string, unknown>> = [
+      { kingschatUsername: { $eq: kingschatUsername } },
     ];
 
     if (email) {
       conditions.push({ email: email.toLowerCase() });
     }
 
-    return this.userModel.findOne({ $or: conditions });
+    console.log('[UserService] findByKingschatUsernameOrEmail query:', {
+      kingschatUsername,
+      email,
+      conditions,
+    });
+
+    const result = await this.userModel.findOne({ $or: conditions });
+
+    console.log('[UserService] findByKingschatUsernameOrEmail result:', result ? {
+      id: result._id.toString(),
+      email: result.email,
+      kingschatUsername: result.kingschatUsername,
+      fullName: result.fullName,
+    } : null);
+
+    return result;
   }
 
   async createFromKingschat(data: {
