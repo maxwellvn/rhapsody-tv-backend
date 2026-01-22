@@ -255,7 +255,25 @@ export class AuthService {
       const responseText = await response.text();
       this.logger.log('[KingsChat] Raw API Response:', responseText.substring(0, 500));
 
-      kingsChatProfile = JSON.parse(responseText);
+      const rawProfile = JSON.parse(responseText);
+      
+      // Log full raw response to see actual field names
+      this.logger.log('[KingsChat] Full raw profile:', JSON.stringify(rawProfile));
+
+      // KingsChat API may return data in different formats - handle both
+      // The profile might be nested under a 'data' or 'user' key
+      const profileData = rawProfile.data || rawProfile.user || rawProfile;
+      
+      // Map to our expected format - try multiple possible field names
+      kingsChatProfile = {
+        id: profileData.id || profileData.user_id || profileData.userId || profileData.kingschat_id,
+        username: profileData.username || profileData.user_name || profileData.userName,
+        email: profileData.email || profileData.email_address,
+        first_name: profileData.first_name || profileData.firstName || profileData.given_name,
+        last_name: profileData.last_name || profileData.lastName || profileData.family_name,
+        display_name: profileData.display_name || profileData.displayName || profileData.name || profileData.full_name || profileData.fullName,
+        avatar: profileData.avatar || profileData.avatar_url || profileData.avatarUrl || profileData.profile_picture || profileData.picture,
+      };
 
       // Log KingsChat profile for debugging
       this.logger.log('[KingsChat] Profile fetched:', {
