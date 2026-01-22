@@ -204,10 +204,15 @@ export class AuthService {
   async loginWithKingsChat(kingsChatLoginDto: KingsChatLoginDto) {
     const { accessToken } = kingsChatLoginDto;
 
+    this.logger.log(`KingsChat login attempt with token: ${accessToken?.substring(0, 20)}...`);
+
     // Fetch user profile from KingsChat API
     const kingsChatProfile = await this.fetchKingsChatProfile(accessToken);
 
+    this.logger.log(`KingsChat profile result: ${JSON.stringify(kingsChatProfile)}`);
+
     if (!kingsChatProfile || !kingsChatProfile.id) {
+      this.logger.error('Failed to fetch KingsChat profile - no profile or no id');
       throw new BadRequestException('Failed to fetch KingsChat profile');
     }
 
