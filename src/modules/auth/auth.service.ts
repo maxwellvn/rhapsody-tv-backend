@@ -228,6 +228,14 @@ export class AuthService {
       }
 
       kingsChatProfile = await response.json();
+
+      // Log KingsChat profile for debugging
+      this.logger.log('[KingsChat] Profile fetched:', {
+        id: kingsChatProfile.id,
+        username: kingsChatProfile.username,
+        email: kingsChatProfile.email,
+        displayName: kingsChatProfile.display_name,
+      });
     } catch (error) {
       this.logger.error('KingsChat API error:', error);
       throw new UnauthorizedException('Failed to authenticate with KingsChat');
@@ -241,6 +249,12 @@ export class AuthService {
         .join(' ') ||
       kingsChatProfile.username;
 
+    this.logger.log('[KingsChat] Looking up/creating user:', {
+      kingschatUsername: kingsChatProfile.username,
+      email: kingsChatProfile.email || `${kingsChatProfile.username}@kingschat.user`,
+      fullName,
+    });
+
     const user = await this.userService.createFromKingschat({
       email:
         kingsChatProfile.email ||
@@ -248,6 +262,13 @@ export class AuthService {
       fullName,
       kingschatUsername: kingsChatProfile.username,
       avatar: kingsChatProfile.avatar,
+    });
+
+    this.logger.log('[KingsChat] User found/created:', {
+      userId: user._id.toString(),
+      email: user.email,
+      fullName: user.fullName,
+      kingschatUsername: user.kingschatUsername,
     });
 
     // Check if user is active
@@ -263,7 +284,7 @@ export class AuthService {
     );
     await this.userService.updateLastLogin(user._id.toString());
 
-    return {
+    const result = {
       user: {
         id: user._id.toString(),
         email: user.email,
@@ -275,6 +296,14 @@ export class AuthService {
       },
       ...tokens,
     };
+
+    this.logger.log('[KingsChat] Returning auth response:', {
+      userId: result.user.id,
+      email: result.user.email,
+      fullName: result.user.fullName,
+    });
+
+    return result;
   }
 
   private async generateTokens(user: UserDocument) {

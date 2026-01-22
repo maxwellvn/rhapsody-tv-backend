@@ -97,10 +97,23 @@ export class UserService {
     kingschatUsername: string;
     avatar?: string;
   }): Promise<UserDocument> {
+    console.log('[UserService] createFromKingschat called with:', {
+      kingschatUsername: data.kingschatUsername,
+      email: data.email,
+      fullName: data.fullName,
+    });
+
     const existingUser = await this.findByKingschatUsernameOrEmail(
       data.kingschatUsername,
       data.email,
     );
+
+    console.log('[UserService] Existing user found:', existingUser ? {
+      id: existingUser._id.toString(),
+      email: existingUser.email,
+      kingschatUsername: existingUser.kingschatUsername,
+      fullName: existingUser.fullName,
+    } : null);
 
     if (existingUser) {
       // Update existing user with KingsChat data if missing
@@ -114,8 +127,11 @@ export class UserService {
       if (Object.keys(updates).length > 0) {
         await this.userModel.findByIdAndUpdate(existingUser._id, updates);
       }
+      console.log('[UserService] Returning existing user');
       return existingUser;
     }
+
+    console.log('[UserService] Creating new user');
 
     // Generate a random password for KingsChat users
     const randomPassword = await bcrypt.hash(
@@ -133,7 +149,14 @@ export class UserService {
       isActive: true,
     });
 
-    return user.save();
+    const savedUser = await user.save();
+    console.log('[UserService] New user created:', {
+      id: savedUser._id.toString(),
+      email: savedUser.email,
+      kingschatUsername: savedUser.kingschatUsername,
+    });
+
+    return savedUser;
   }
 
   async markEmailVerified(userId: string): Promise<void> {
