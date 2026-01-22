@@ -272,12 +272,14 @@ export class AuthService {
     }
 
     // Create or get user from KingsChat data
+    // Ensure fullName is never empty - use multiple fallbacks
     const fullName =
       kingsChatProfile.display_name ||
       [kingsChatProfile.first_name, kingsChatProfile.last_name]
         .filter(Boolean)
         .join(' ') ||
-      kingsChatProfile.username;
+      kingsChatProfile.username ||
+      `KingsChat User ${kingsChatProfile.id}`;
 
     this.logger.log('[KingsChat] Looking up/creating user:', {
       kingschatId: kingsChatProfile.id,
