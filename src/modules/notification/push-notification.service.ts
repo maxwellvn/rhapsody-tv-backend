@@ -261,6 +261,13 @@ export class PushNotificationService {
       createdAt: notification.createdAt,
     });
 
+    // Send updated unread count
+    const unreadCount = await this.notificationModel.countDocuments({
+      userId: new Types.ObjectId(userId),
+      isRead: false,
+    });
+    this.notificationGateway.sendUnreadCountToUser(userId, unreadCount);
+
     // Send push notification (for native builds)
     await this.sendToUser(userId, {
       title,
@@ -305,23 +312,30 @@ export class PushNotificationService {
     const createdNotifications = await this.notificationModel.insertMany(notifications);
 
     // Send via WebSocket to all users (real-time, works in Expo Go)
-    const notificationPayload = {
-      type,
-      title,
-      message,
-      data,
-      imageUrl,
-      isRead: false,
-      createdAt: new Date(),
-    };
-    
-    // Send to each user with their specific notification ID
-    createdNotifications.forEach((notification, index) => {
-      this.notificationGateway.sendNotificationToUser(userIds[index], {
+    // Also send updated unread count for each user
+    for (let i = 0; i < createdNotifications.length; i++) {
+      const notification = createdNotifications[i];
+      const userId = userIds[i];
+      
+      // Send the notification
+      this.notificationGateway.sendNotificationToUser(userId, {
         _id: notification._id.toString(),
-        ...notificationPayload,
+        type,
+        title,
+        message,
+        data,
+        imageUrl,
+        isRead: false,
+        createdAt: notification.createdAt,
       });
-    });
+      
+      // Send updated unread count
+      const unreadCount = await this.notificationModel.countDocuments({
+        userId: new Types.ObjectId(userId),
+        isRead: false,
+      });
+      this.notificationGateway.sendUnreadCountToUser(userId, unreadCount);
+    }
 
     // Send push notifications (for native builds)
     await this.sendToUsers(userIds, {
@@ -347,9 +361,10 @@ export class PushNotificationService {
       broadcastId?: string;
     },
     imageUrl?: string,
-  ): Promise<{ sent: number; failed: number }> {
+  ): Promise<{ sent: number; failed: number; websocketSent: number }> {
     // Get all connected user IDs to create individual notifications
     const connectedUserIds = this.notificationGateway.getConnectedUserIds();
+    let websocketSent = 0;
     
     if (connectedUserIds.length > 0) {
       // Create individual notifications for connected users
@@ -365,8 +380,13 @@ export class PushNotificationService {
       const createdNotifications = await this.notificationModel.insertMany(notifications);
 
       // Send via WebSocket to each connected user with their notification ID
-      createdNotifications.forEach((notification, index) => {
-        this.notificationGateway.sendNotificationToUser(connectedUserIds[index], {
+      // Also send updated unread count
+      for (let i = 0; i < createdNotifications.length; i++) {
+        const notification = createdNotifications[i];
+        const userId = connectedUserIds[i];
+        
+        // Send the notification
+        this.notificationGateway.sendNotificationToUser(userId, {
           _id: notification._id.toString(),
           type,
           title,
@@ -376,17 +396,31 @@ export class PushNotificationService {
           isRead: false,
           createdAt: notification.createdAt,
         });
-      });
+        
+        // Get and send updated unread count for this user
+        const unreadCount = await this.notificationModel.countDocuments({
+          userId: new Types.ObjectId(userId),
+          isRead: false,
+        });
+        this.notificationGateway.sendUnreadCountToUser(userId, unreadCount);
+      }
 
-      this.logger.log(`Created ${connectedUserIds.length} notifications for connected users via WebSocket`);
+      websocketSent = connectedUserIds.length;
+      this.logger.log(`Created ${websocketSent} notifications for connected users via WebSocket`);
     }
 
     // Send push notifications for users with registered tokens (for native builds)
-    return this.broadcast({
+    const pushResult = await this.broadcast({
       title,
       body: message,
       data: { type, ...data },
       imageUrl,
     });
+
+    return {
+      sent: pushResult.sent,
+      failed: pushResult.failed,
+      websocketSent,
+    };
   }
 }

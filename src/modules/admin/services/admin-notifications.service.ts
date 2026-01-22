@@ -93,12 +93,13 @@ export class AdminNotificationsService {
           dto.imageUrl,
         );
 
-        broadcast.sentCount = result.sent;
+        // Count both WebSocket and push notifications as sent
+        broadcast.sentCount = result.websocketSent + result.sent;
         broadcast.failedCount = result.failed;
         broadcast.sentAt = new Date();
         await broadcast.save();
 
-        this.logger.log(`Broadcast sent to all users: ${result.sent} push sent, ${result.failed} push failed (WebSocket also sent)`);
+        this.logger.log(`Broadcast sent: ${result.websocketSent} via WebSocket, ${result.sent} via push (${result.failed} push failed)`);
         return broadcast;
 
       case BroadcastTarget.CHANNEL_SUBSCRIBERS:
