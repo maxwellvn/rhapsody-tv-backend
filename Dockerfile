@@ -72,9 +72,6 @@ COPY --from=backend-builder --chown=nestjs:nodejs /app/package.json ./
 # Copy built admin app to public/admin directory
 COPY --from=admin-builder --chown=nestjs:nodejs /app/admin-app/dist ./public/admin
 
-# Copy PHP auth callback files (KingsChat OAuth)
-COPY --chown=nestjs:nodejs public/auth ./public/auth
-
 # Copy and setup entrypoint script
 COPY --chown=nestjs:nodejs docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh

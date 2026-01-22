@@ -6,12 +6,10 @@ import {
   BroadcastNotificationDocument,
   BroadcastTarget,
 } from '../../notification/schemas/broadcast-notification.schema';
-import { Notification, NotificationDocument, NotificationType } from '../../notification/notification.schema';
+import { NotificationType } from '../../notification/notification.schema';
 import { PushNotificationService } from '../../notification/push-notification.service';
-import { NotificationGateway } from '../../notification/notification.gateway';
 import { Subscription, SubscriptionDocument } from '../../channel/schemas/subscription.schema';
 import { ProgramSubscription, ProgramSubscriptionDocument } from '../../channel/schemas/program-subscription.schema';
-import { User, UserDocument } from '../../user/schemas/user.schema';
 
 export interface SendNotificationDto {
   type: NotificationType;
@@ -51,16 +49,11 @@ export class AdminNotificationsService {
   constructor(
     @InjectModel(BroadcastNotification.name)
     private broadcastModel: Model<BroadcastNotificationDocument>,
-    @InjectModel(Notification.name)
-    private notificationModel: Model<NotificationDocument>,
     @InjectModel(Subscription.name)
     private subscriptionModel: Model<SubscriptionDocument>,
     @InjectModel(ProgramSubscription.name)
     private programSubscriptionModel: Model<ProgramSubscriptionDocument>,
-    @InjectModel(User.name)
-    private userModel: Model<UserDocument>,
     private pushNotificationService: PushNotificationService,
-    private notificationGateway: NotificationGateway,
   ) {}
 
   /**
@@ -88,23 +81,7 @@ export class AdminNotificationsService {
 
     switch (dto.target) {
       case BroadcastTarget.ALL:
-        // Get all users
-        const allUsers = await this.userModel.find({}, { _id: 1 }).lean();
-        const allUserIds = allUsers.map((u) => u._id.toString());
-
-        if (allUserIds.length > 0) {
-          // Create in-app notifications for all users
-          await this.createNotificationsForUsers(
-            allUserIds,
-            dto.type,
-            dto.title,
-            dto.message,
-            dto.data,
-            dto.imageUrl,
-          );
-        }
-
-        // Send push notifications
+        // For broadcast to all, we use the push service's broadcast method
         const result = await this.pushNotificationService.broadcast({
           title: dto.title,
           body: dto.message,
@@ -116,12 +93,12 @@ export class AdminNotificationsService {
           imageUrl: dto.imageUrl,
         });
 
-        broadcast.sentCount = allUserIds.length;
+        broadcast.sentCount = result.sent;
         broadcast.failedCount = result.failed;
         broadcast.sentAt = new Date();
         await broadcast.save();
 
-        this.logger.log(`Broadcast sent to ${allUserIds.length} users, push: ${result.sent} sent, ${result.failed} failed`);
+        this.logger.log(`Broadcast sent to all users: ${result.sent} sent, ${result.failed} failed`);
         return broadcast;
 
       case BroadcastTarget.CHANNEL_SUBSCRIBERS:
@@ -251,69 +228,6 @@ export class AdminNotificationsService {
     }
 
     this.logger.log(`Broadcast notification deleted: ${id}`);
-  }
-
-  /**
-   * Create notifications for multiple users and send WebSocket events
-   */
-  private async createNotificationsForUsers(
-    userIds: string[],
-    type: NotificationType,
-    title: string,
-    message: string,
-    data?: {
-      videoId?: string;
-      channelId?: string;
-      programId?: string;
-      livestreamId?: string;
-      link?: string;
-    },
-    imageUrl?: string,
-  ): Promise<void> {
-    // Create notifications in bulk
-    const notifications = userIds.map((userId) => ({
-      userId: new Types.ObjectId(userId),
-      type,
-      title,
-      message,
-      data,
-      imageUrl,
-      isRead: false,
-    }));
-
-    const insertedNotifications = await this.notificationModel.insertMany(notifications);
-
-    // Send WebSocket events to each user
-    for (let i = 0; i < userIds.length; i++) {
-      const userId = userIds[i];
-      const notification = insertedNotifications[i];
-
-      const transformedNotification = {
-        id: notification._id.toString(),
-        type: notification.type,
-        title: notification.title,
-        message: notification.message,
-        thumbnail: notification.imageUrl,
-        isRead: notification.isRead,
-        createdAt: notification.createdAt,
-        videoId: notification.data?.videoId,
-        channelId: notification.data?.channelId,
-        programId: notification.data?.programId,
-        livestreamId: notification.data?.livestreamId,
-      };
-
-      // Send real-time notification
-      this.notificationGateway.sendNotificationToUser(userId, transformedNotification);
-
-      // Send updated unread count
-      const unreadCount = await this.notificationModel.countDocuments({
-        userId: new Types.ObjectId(userId),
-        isRead: false,
-      });
-      this.notificationGateway.sendUnreadCountToUser(userId, unreadCount);
-    }
-
-    this.logger.log(`Created ${userIds.length} in-app notifications`);
   }
 
   /**

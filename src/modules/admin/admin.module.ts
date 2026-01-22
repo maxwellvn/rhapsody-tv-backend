@@ -11,8 +11,6 @@ import {
 } from '../stream/schemas/live-stream.schema';
 import { Video, VideoSchema } from '../stream/schemas/video.schema';
 import { BroadcastNotification, BroadcastNotificationSchema } from '../notification/schemas/broadcast-notification.schema';
-import { Notification, NotificationSchema } from '../notification/notification.schema';
-import { User, UserSchema } from '../user/schemas/user.schema';
 import { AdminChannelsController } from './controllers/admin-channels.controller';
 import { AdminLivestreamsController } from './controllers/admin-livestreams.controller';
 import { AdminVideosController } from './controllers/admin-videos.controller';
@@ -38,8 +36,6 @@ import { NotificationModule } from '../notification/notification.module';
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: ProgramSubscription.name, schema: ProgramSubscriptionSchema },
       { name: BroadcastNotification.name, schema: BroadcastNotificationSchema },
-      { name: Notification.name, schema: NotificationSchema },
-      { name: User.name, schema: UserSchema },
     ]),
   ],
   controllers: [

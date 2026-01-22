@@ -16,10 +16,4 @@ export class AuthUserDto {
 
   @ApiProperty({ example: true })
   isEmailVerified: boolean;
-
-  @ApiProperty({ example: 'kingschat_user', required: false })
-  kingschatUsername?: string;
-
-  @ApiProperty({ example: 'https://example.com/avatar.jpg', required: false })
-  avatar?: string;
 }
