@@ -344,6 +344,7 @@ export class PushNotificationService {
       channelId?: string;
       programId?: string;
       livestreamId?: string;
+      broadcastId?: string;
     },
     imageUrl?: string,
   ): Promise<{ sent: number; failed: number }> {

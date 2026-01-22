@@ -81,24 +81,24 @@ export class AdminNotificationsService {
 
     switch (dto.target) {
       case BroadcastTarget.ALL:
-        // For broadcast to all, we use the push service's broadcast method
-        const result = await this.pushNotificationService.broadcast({
-          title: dto.title,
-          body: dto.message,
-          data: {
-            type: dto.type,
+        // For broadcast to all, use broadcastNotification which sends via WebSocket + Push
+        const result = await this.pushNotificationService.broadcastNotification(
+          dto.type,
+          dto.title,
+          dto.message,
+          {
             broadcastId: broadcast._id.toString(),
             ...dto.data,
           },
-          imageUrl: dto.imageUrl,
-        });
+          dto.imageUrl,
+        );
 
         broadcast.sentCount = result.sent;
         broadcast.failedCount = result.failed;
         broadcast.sentAt = new Date();
         await broadcast.save();
 
-        this.logger.log(`Broadcast sent to all users: ${result.sent} sent, ${result.failed} failed`);
+        this.logger.log(`Broadcast sent to all users: ${result.sent} push sent, ${result.failed} push failed (WebSocket also sent)`);
         return broadcast;
 
       case BroadcastTarget.CHANNEL_SUBSCRIBERS:
