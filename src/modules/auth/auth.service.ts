@@ -204,6 +204,8 @@ export class AuthService {
     // Fetch user profile from KingsChat API
     const kingsChatApiUrl = process.env.KINGSCHAT_API_URL || 'https://connect.kingsch.at/api/profile';
 
+    this.logger.log('[KingsChat] Fetching profile from:', { url: kingsChatApiUrl });
+
     let kingsChatProfile: {
       id: string;
       username: string;
@@ -223,11 +225,25 @@ export class AuthService {
         },
       });
 
+      this.logger.log('[KingsChat] API Response status:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+      });
+
       if (!response.ok) {
+        const errorText = await response.text();
+        this.logger.error('[KingsChat] API Error Response:', {
+          status: response.status,
+          body: errorText,
+        });
         throw new UnauthorizedException('Failed to authenticate with KingsChat');
       }
 
-      kingsChatProfile = await response.json();
+      const responseText = await response.text();
+      this.logger.log('[KingsChat] Raw API Response:', responseText.substring(0, 500));
+
+      kingsChatProfile = JSON.parse(responseText);
 
       // Log KingsChat profile for debugging
       this.logger.log('[KingsChat] Profile fetched:', {
@@ -235,6 +251,8 @@ export class AuthService {
         username: kingsChatProfile.username,
         email: kingsChatProfile.email,
         displayName: kingsChatProfile.display_name,
+        firstName: kingsChatProfile.first_name,
+        lastName: kingsChatProfile.last_name,
       });
     } catch (error) {
       this.logger.error('KingsChat API error:', error);
