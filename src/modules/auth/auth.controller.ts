@@ -1,20 +1,25 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   UseGuards,
   HttpCode,
   HttpStatus,
   Req,
+  Res,
+  Query,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
   ApiBody,
   ApiResponse,
   ApiBearerAuth,
+  ApiExcludeEndpoint,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import type { UserDocument } from '../user/schemas/user.schema';
@@ -39,6 +44,8 @@ import { Public, CurrentUser } from '../../common/decorators';
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(private readonly authService: AuthService) {}
 
   @Public()
@@ -95,6 +102,101 @@ export class AuthController {
       message: 'KingsChat login successful',
       data: result,
     };
+  }
+
+  /**
+   * KingsChat OAuth callback endpoint
+   * Receives POST with token from KingsChat and redirects to mobile app
+   */
+  @Public()
+  @Post('kingschat/callback')
+  @ApiExcludeEndpoint()
+  async kingsChatCallback(
+    @Body() body: any,
+    @Query('app_redirect') appRedirect: string,
+    @Res() res: Response,
+  ) {
+    this.logger.log('KingsChat callback received');
+    this.logger.log('Body:', JSON.stringify(body));
+    this.logger.log('App redirect:', appRedirect);
+
+    // Extract token from body (KingsChat sends it via POST)
+    const accessToken = body?.accessToken || body?.access_token;
+    const refreshToken = body?.refreshToken || body?.refresh_token;
+    const expiresIn = body?.expiresInMillis || body?.expires_in_millis || body?.expires_in;
+
+    if (!accessToken) {
+      this.logger.error('No access token in callback body');
+      const errorRedirect = `${appRedirect}?error=no_token`;
+      return res.redirect(errorRedirect);
+    }
+
+    // Build redirect URL with tokens
+    const params = new URLSearchParams({
+      access_token: accessToken,
+    });
+
+    if (refreshToken) {
+      params.append('refresh_token', refreshToken);
+    }
+
+    if (expiresIn) {
+      params.append('expires_in_millis', String(expiresIn));
+    }
+
+    const redirectUrl = `${appRedirect}?${params.toString()}`;
+    this.logger.log('Redirecting to:', redirectUrl);
+
+    return res.redirect(redirectUrl);
+  }
+
+  /**
+   * KingsChat OAuth callback endpoint (GET fallback)
+   */
+  @Public()
+  @Get('kingschat/callback')
+  @ApiExcludeEndpoint()
+  async kingsChatCallbackGet(
+    @Query() query: any,
+    @Res() res: Response,
+  ) {
+    this.logger.log('KingsChat callback GET received');
+    this.logger.log('Query:', JSON.stringify(query));
+
+    const appRedirect = query.app_redirect;
+    const accessToken = query.accessToken || query.access_token;
+    const refreshToken = query.refreshToken || query.refresh_token;
+    const expiresIn = query.expiresInMillis || query.expires_in_millis || query.expires_in;
+
+    if (!accessToken) {
+      this.logger.error('No access token in callback query');
+      if (appRedirect) {
+        return res.redirect(`${appRedirect}?error=no_token`);
+      }
+      return res.status(400).json({ error: 'No access token received' });
+    }
+
+    if (!appRedirect) {
+      return res.status(400).json({ error: 'No app_redirect specified' });
+    }
+
+    // Build redirect URL with tokens
+    const params = new URLSearchParams({
+      access_token: accessToken,
+    });
+
+    if (refreshToken) {
+      params.append('refresh_token', refreshToken);
+    }
+
+    if (expiresIn) {
+      params.append('expires_in_millis', String(expiresIn));
+    }
+
+    const redirectUrl = `${appRedirect}?${params.toString()}`;
+    this.logger.log('Redirecting to:', redirectUrl);
+
+    return res.redirect(redirectUrl);
   }
 
   @Public()
