@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Query, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
+import { Public } from '../../common/decorators/public.decorator';
 
 @Controller('auth')
 export class KingsChatCallbackController {
@@ -10,6 +11,7 @@ export class KingsChatCallbackController {
    * Handle GET requests for the callback
    * KingsChat may send GET requests with tokens in query params
    */
+  @Public()
   @Get('kingschat-callback')
   public handleGetCallback(@Query() query: Record<string, string>, @Res() res: Response) {
     const accessToken = query.accessToken || query.access_token || null;
@@ -23,6 +25,7 @@ export class KingsChatCallbackController {
    * Handle POST requests for the callback
    * KingsChat sends POST requests with tokens in form data when using post_redirect=true
    */
+  @Public()
   @Post('kingschat-callback')
   public async handlePostCallback(@Req() req: Request, @Res() res: Response) {
     let accessToken: string | null = null;
