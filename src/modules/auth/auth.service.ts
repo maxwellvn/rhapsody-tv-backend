@@ -84,6 +84,8 @@ export class AuthService {
         fullName: user.fullName,
         roles: user.roles,
         isEmailVerified: user.isEmailVerified,
+        avatar: user.avatar,
+        username: user.username,
       },
       ...tokens,
     };
@@ -168,6 +170,8 @@ export class AuthService {
         fullName: user.fullName,
         roles: user.roles,
         isEmailVerified: user.isEmailVerified,
+        avatar: user.avatar,
+        username: user.username,
       },
       ...tokens,
     };
@@ -204,15 +208,11 @@ export class AuthService {
   async loginWithKingsChat(kingsChatLoginDto: KingsChatLoginDto) {
     const { accessToken } = kingsChatLoginDto;
 
-    this.logger.log(`KingsChat login attempt with token: ${accessToken?.substring(0, 20)}...`);
-
     // Fetch user profile from KingsChat API
     const kingsChatProfile = await this.fetchKingsChatProfile(accessToken);
 
-    this.logger.log(`KingsChat profile result: ${JSON.stringify(kingsChatProfile)}`);
-
     if (!kingsChatProfile || !kingsChatProfile.id) {
-      this.logger.error('Failed to fetch KingsChat profile - no profile or no id');
+      this.logger.error('Failed to fetch KingsChat profile');
       throw new BadRequestException('Failed to fetch KingsChat profile');
     }
 
@@ -294,7 +294,6 @@ export class AuthService {
       }
 
       const data = await response.json();
-      this.logger.log(`KingsChat profile data: ${JSON.stringify(data)}`);
 
       // KingsChat returns profile in nested format: { profile: { user: {...}, email: {...} } }
       const profileData = data.profile || data;

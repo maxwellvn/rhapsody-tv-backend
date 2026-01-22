@@ -116,25 +116,16 @@ export class AuthController {
     @Query('app_redirect') appRedirect: string,
     @Res() res: Response,
   ) {
-    this.logger.log('KingsChat callback received');
-    this.logger.log('Body:', JSON.stringify(body));
-    this.logger.log('App redirect:', appRedirect);
-
-    // Extract token from body (KingsChat sends it via POST)
     const accessToken = body?.accessToken || body?.access_token;
     const refreshToken = body?.refreshToken || body?.refresh_token;
     const expiresIn = body?.expiresInMillis || body?.expires_in_millis || body?.expires_in;
 
     if (!accessToken) {
-      this.logger.error('No access token in callback body');
       const errorRedirect = `${appRedirect}?error=no_token`;
       return res.redirect(errorRedirect);
     }
 
-    // Build redirect URL with tokens
-    const params = new URLSearchParams({
-      access_token: accessToken,
-    });
+    const params = new URLSearchParams({ access_token: accessToken });
 
     if (refreshToken) {
       params.append('refresh_token', refreshToken);
@@ -144,10 +135,7 @@ export class AuthController {
       params.append('expires_in_millis', String(expiresIn));
     }
 
-    const redirectUrl = `${appRedirect}?${params.toString()}`;
-    this.logger.log('Redirecting to:', redirectUrl);
-
-    return res.redirect(redirectUrl);
+    return res.redirect(`${appRedirect}?${params.toString()}`);
   }
 
   /**
