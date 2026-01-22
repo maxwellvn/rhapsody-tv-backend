@@ -1,11 +1,12 @@
-import { Controller, Get, Post, Delete, Param, Query, Body } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Query, Body, Patch } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { NotificationService } from './notification.service';
 import { PushNotificationService } from './push-notification.service';
+import { NotificationPreferencesService, UpdateNotificationPreferencesDto } from './notification-preferences.service';
 import { CurrentUser } from '../../common/decorators';
 import { ApiOkSuccessResponse } from '../../common/swagger';
 import type { UserDocument } from '../user/schemas/user.schema';
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsBoolean } from 'class-validator';
 
 class RegisterTokenDto {
   @IsString()
@@ -20,6 +21,28 @@ class RegisterTokenDto {
   deviceId?: string;
 }
 
+class UpdatePreferencesDto implements UpdateNotificationPreferencesDto {
+  @IsOptional()
+  @IsBoolean()
+  subscriptions?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  recommendedVideos?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  commentActivity?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  newChannels?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  livestreams?: boolean;
+}
+
 @ApiTags('Notifications')
 @ApiBearerAuth()
 @Controller('notifications')
@@ -27,6 +50,7 @@ export class NotificationController {
   constructor(
     private readonly notificationService: NotificationService,
     private readonly pushNotificationService: PushNotificationService,
+    private readonly preferencesService: NotificationPreferencesService,
   ) {}
 
   @Get()
@@ -142,6 +166,50 @@ export class NotificationController {
     return {
       success: true,
       message: 'Push notification token unregistered successfully',
+    };
+  }
+
+  @Get('preferences')
+  @ApiOperation({ summary: 'Get notification preferences' })
+  @ApiOkSuccessResponse({ description: 'Preferences retrieved successfully' })
+  async getPreferences(@CurrentUser() user: UserDocument) {
+    const preferences = await this.preferencesService.getPreferences(user._id.toString());
+
+    return {
+      success: true,
+      message: 'Notification preferences retrieved successfully',
+      data: {
+        subscriptions: preferences.subscriptions,
+        recommendedVideos: preferences.recommendedVideos,
+        commentActivity: preferences.commentActivity,
+        newChannels: preferences.newChannels,
+        livestreams: preferences.livestreams,
+      },
+    };
+  }
+
+  @Patch('preferences')
+  @ApiOperation({ summary: 'Update notification preferences' })
+  @ApiOkSuccessResponse({ description: 'Preferences updated successfully' })
+  async updatePreferences(
+    @CurrentUser() user: UserDocument,
+    @Body() dto: UpdatePreferencesDto,
+  ) {
+    const preferences = await this.preferencesService.updatePreferences(
+      user._id.toString(),
+      dto,
+    );
+
+    return {
+      success: true,
+      message: 'Notification preferences updated successfully',
+      data: {
+        subscriptions: preferences.subscriptions,
+        recommendedVideos: preferences.recommendedVideos,
+        commentActivity: preferences.commentActivity,
+        newChannels: preferences.newChannels,
+        livestreams: preferences.livestreams,
+      },
     };
   }
 }

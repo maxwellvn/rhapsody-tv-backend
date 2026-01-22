@@ -18,6 +18,7 @@ export enum NotificationType {
   PROGRAM_STARTING = 'program_starting',
   ANNOUNCEMENT = 'announcement',
   SYSTEM = 'system',
+  RECOMMENDED_VIDEO = 'recommended_video',
 }
 
 @Schema({ timestamps: true })

@@ -2,16 +2,21 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Channel, ChannelDocument } from '../../channel/schemas/channel.schema';
 import { CreateChannelDto, UpdateChannelDto } from '../dto/channels';
+import { AdminNotificationsService } from './admin-notifications.service';
 
 @Injectable()
 export class AdminChannelsService {
+  private readonly logger = new Logger(AdminChannelsService.name);
+
   constructor(
     @InjectModel(Channel.name) private channelModel: Model<ChannelDocument>,
+    private readonly adminNotificationsService: AdminNotificationsService,
   ) {}
 
   async create(dto: CreateChannelDto): Promise<ChannelDocument> {
@@ -28,7 +33,19 @@ export class AdminChannelsService {
       slug: dto.slug.toLowerCase(),
     });
 
-    return channel.save();
+    const savedChannel = await channel.save();
+
+    // Send notification to all users about new channel (async, don't wait)
+    this.adminNotificationsService.notifyNewChannel(
+      savedChannel._id.toString(),
+      savedChannel.name,
+      savedChannel.description,
+      savedChannel.logoUrl,
+    ).catch((error) => {
+      this.logger.error('Error sending channel notification:', error);
+    });
+
+    return savedChannel;
   }
 
   async findAll(

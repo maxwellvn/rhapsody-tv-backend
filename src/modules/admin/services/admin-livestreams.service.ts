@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -7,17 +7,24 @@ import {
   LiveStreamStatus,
   LiveStreamScheduleType,
 } from '../../stream/schemas/live-stream.schema';
+import { Channel, ChannelDocument } from '../../channel/schemas/channel.schema';
 import {
   CreateLivestreamDto,
   UpdateLivestreamDto,
   UpdateLivestreamStatusDto,
 } from '../dto/livestreams';
+import { AdminNotificationsService } from './admin-notifications.service';
 
 @Injectable()
 export class AdminLivestreamsService {
+  private readonly logger = new Logger(AdminLivestreamsService.name);
+
   constructor(
     @InjectModel(LiveStream.name)
     private livestreamModel: Model<LiveStreamDocument>,
+    @InjectModel(Channel.name)
+    private channelModel: Model<ChannelDocument>,
+    private readonly adminNotificationsService: AdminNotificationsService,
   ) {}
 
   async create(dto: CreateLivestreamDto): Promise<LiveStreamDocument> {
@@ -39,7 +46,36 @@ export class AdminLivestreamsService {
       startedAt: defaultStatus === LiveStreamStatus.LIVE ? new Date() : undefined,
     });
 
-    return livestream.save();
+    const savedLivestream = await livestream.save();
+
+    // Send notification if livestream is going live
+    if (defaultStatus === LiveStreamStatus.LIVE) {
+      this.sendLivestreamNotification(savedLivestream, dto.channelId, true).catch((error) => {
+        this.logger.error('Error sending livestream notification:', error);
+      });
+    }
+
+    return savedLivestream;
+  }
+
+  private async sendLivestreamNotification(
+    livestream: LiveStreamDocument, 
+    channelId: string,
+    isLive: boolean,
+  ): Promise<void> {
+    // Get channel name for the notification
+    const channel = await this.channelModel.findById(channelId);
+    
+    if (channel) {
+      await this.adminNotificationsService.notifyNewLivestream(
+        channelId,
+        livestream._id.toString(),
+        livestream.title,
+        channel.name,
+        livestream.thumbnailUrl,
+        isLive,
+      );
+    }
   }
 
   async findAll(

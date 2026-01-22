@@ -2,8 +2,10 @@ import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Video, VideoDocument } from '../../stream/schemas/video.schema';
+import { Channel, ChannelDocument } from '../../channel/schemas/channel.schema';
 import { CreateVideoDto, UpdateVideoDto } from '../dto/videos';
 import { VideoProbeService } from '../../../shared/services/video-probe';
+import { AdminNotificationsService } from './admin-notifications.service';
 
 @Injectable()
 export class AdminVideosService {
@@ -11,7 +13,9 @@ export class AdminVideosService {
 
   constructor(
     @InjectModel(Video.name) private videoModel: Model<VideoDocument>,
+    @InjectModel(Channel.name) private channelModel: Model<ChannelDocument>,
     private readonly videoProbeService: VideoProbeService,
+    private readonly adminNotificationsService: AdminNotificationsService,
   ) {}
 
   async create(dto: CreateVideoDto): Promise<VideoDocument> {
@@ -34,7 +38,29 @@ export class AdminVideosService {
       durationSeconds,
     });
 
-    return video.save();
+    const savedVideo = await video.save();
+
+    // Send notification to channel subscribers (async, don't wait)
+    this.sendVideoNotification(savedVideo, dto.channelId).catch((error) => {
+      this.logger.error('Error sending video notification:', error);
+    });
+
+    return savedVideo;
+  }
+
+  private async sendVideoNotification(video: VideoDocument, channelId: string): Promise<void> {
+    // Get channel name for the notification
+    const channel = await this.channelModel.findById(channelId);
+    
+    if (channel) {
+      await this.adminNotificationsService.notifyNewVideo(
+        channelId,
+        video._id.toString(),
+        video.title,
+        channel.name,
+        video.thumbnailUrl,
+      );
+    }
   }
 
   async findAll(
