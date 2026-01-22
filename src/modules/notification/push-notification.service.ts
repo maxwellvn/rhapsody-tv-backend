@@ -246,7 +246,7 @@ export class PushNotificationService {
       title,
       message,
       data,
-      imageUrl,
+      ...(imageUrl && { imageUrl }),
     });
 
     // Send via WebSocket (real-time, works in Expo Go)
@@ -256,7 +256,7 @@ export class PushNotificationService {
       title,
       message,
       data,
-      imageUrl,
+      ...(imageUrl && { imageUrl }),
       isRead: false,
       createdAt: notification.createdAt,
     });
@@ -277,7 +277,7 @@ export class PushNotificationService {
         notificationId: notification._id.toString(),
         ...data,
       },
-      imageUrl,
+      ...(imageUrl && { imageUrl }),
     });
 
     return notification;
@@ -306,7 +306,7 @@ export class PushNotificationService {
       title,
       message,
       data,
-      imageUrl,
+      ...(imageUrl && { imageUrl }),
     }));
 
     const createdNotifications = await this.notificationModel.insertMany(notifications);
@@ -324,7 +324,7 @@ export class PushNotificationService {
         title,
         message,
         data,
-        imageUrl,
+        ...(imageUrl && { imageUrl }),
         isRead: false,
         createdAt: notification.createdAt,
       });
@@ -342,7 +342,7 @@ export class PushNotificationService {
       title,
       body: message,
       data: { type, ...data },
-      imageUrl,
+      ...(imageUrl && { imageUrl }),
     });
   }
 
@@ -374,7 +374,7 @@ export class PushNotificationService {
         title,
         message,
         data,
-        imageUrl,
+        ...(imageUrl && { imageUrl }),
       }));
 
       const createdNotifications = await this.notificationModel.insertMany(notifications);
@@ -392,7 +392,7 @@ export class PushNotificationService {
           title,
           message,
           data,
-          imageUrl,
+          ...(imageUrl && { imageUrl }),
           isRead: false,
           createdAt: notification.createdAt,
         });
@@ -414,7 +414,7 @@ export class PushNotificationService {
       title,
       body: message,
       data: { type, ...data },
-      imageUrl,
+      ...(imageUrl && { imageUrl }),
     });
 
     return {
