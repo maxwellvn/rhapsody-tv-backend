@@ -348,19 +348,40 @@ export class PushNotificationService {
     },
     imageUrl?: string,
   ): Promise<{ sent: number; failed: number }> {
-    // Broadcast via WebSocket to all connected users (real-time, works in Expo Go)
-    this.notificationGateway.broadcastNotification({
-      type,
-      title,
-      message,
-      data,
-      imageUrl,
-      isRead: false,
-      createdAt: new Date(),
-    });
+    // Get all connected user IDs to create individual notifications
+    const connectedUserIds = this.notificationGateway.getConnectedUserIds();
+    
+    if (connectedUserIds.length > 0) {
+      // Create individual notifications for connected users
+      const notifications = connectedUserIds.map((userId) => ({
+        userId: new Types.ObjectId(userId),
+        type,
+        title,
+        message,
+        data,
+        imageUrl,
+      }));
 
-    // For broadcast, we create notifications when users fetch them
-    // Send push notifications (for native builds)
+      const createdNotifications = await this.notificationModel.insertMany(notifications);
+
+      // Send via WebSocket to each connected user with their notification ID
+      createdNotifications.forEach((notification, index) => {
+        this.notificationGateway.sendNotificationToUser(connectedUserIds[index], {
+          _id: notification._id.toString(),
+          type,
+          title,
+          message,
+          data,
+          imageUrl,
+          isRead: false,
+          createdAt: notification.createdAt,
+        });
+      });
+
+      this.logger.log(`Created ${connectedUserIds.length} notifications for connected users via WebSocket`);
+    }
+
+    // Send push notifications for users with registered tokens (for native builds)
     return this.broadcast({
       title,
       body: message,
