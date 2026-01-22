@@ -26,6 +26,7 @@ import {
   RegisterDto,
   LoginDto,
   RefreshTokenDto,
+  KingsChatAuthDto,
   AuthLoginResponseDto,
   AuthTokensDto,
   EmailOnlyResponseDto,
@@ -73,6 +74,27 @@ export class AuthController {
     return {
       success: true,
       message: 'Login successful',
+      data: result,
+    };
+  }
+
+  @Public()
+  @Post('kingschat')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Authenticate with KingsChat OAuth token' })
+  @ApiBody({ type: KingsChatAuthDto })
+  @ApiOkSuccessResponse({
+    description: 'KingsChat authentication successful',
+    model: AuthLoginResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Invalid KingsChat token' })
+  async loginWithKingschat(@Body() kingschatDto: KingsChatAuthDto) {
+    const result = await this.authService.loginWithKingschat(
+      kingschatDto.access_token,
+    );
+    return {
+      success: true,
+      message: 'KingsChat authentication successful',
       data: result,
     };
   }

@@ -72,6 +72,70 @@ export class UserService {
     return this.userModel.findOne({ email: email.toLowerCase() });
   }
 
+  async findByKingschatUsername(kingschatUsername: string): Promise<UserDocument | null> {
+    return this.userModel.findOne({ kingschatUsername });
+  }
+
+  async findByKingschatUsernameOrEmail(
+    kingschatUsername: string,
+    email?: string,
+  ): Promise<UserDocument | null> {
+    const conditions: Array<Record<string, string>> = [
+      { kingschatUsername },
+    ];
+
+    if (email) {
+      conditions.push({ email: email.toLowerCase() });
+    }
+
+    return this.userModel.findOne({ $or: conditions });
+  }
+
+  async createFromKingschat(data: {
+    email: string;
+    fullName: string;
+    kingschatUsername: string;
+    avatar?: string;
+  }): Promise<UserDocument> {
+    const existingUser = await this.findByKingschatUsernameOrEmail(
+      data.kingschatUsername,
+      data.email,
+    );
+
+    if (existingUser) {
+      // Update existing user with KingsChat data if missing
+      const updates: Partial<Record<string, unknown>> = {};
+      if (!existingUser.kingschatUsername) {
+        updates.kingschatUsername = data.kingschatUsername;
+      }
+      if (!existingUser.avatar && data.avatar) {
+        updates.avatar = data.avatar;
+      }
+      if (Object.keys(updates).length > 0) {
+        await this.userModel.findByIdAndUpdate(existingUser._id, updates);
+      }
+      return existingUser;
+    }
+
+    // Generate a random password for KingsChat users
+    const randomPassword = await bcrypt.hash(
+      Math.random().toString(36).substring(2, 15),
+      12,
+    );
+
+    const user = new this.userModel({
+      email: data.email.toLowerCase(),
+      fullName: data.fullName,
+      kingschatUsername: data.kingschatUsername,
+      avatar: data.avatar,
+      password: randomPassword,
+      isEmailVerified: true, // Auto-verify KingsChat users
+      isActive: true,
+    });
+
+    return user.save();
+  }
+
   async markEmailVerified(userId: string): Promise<void> {
     await this.userModel.findByIdAndUpdate(userId, {
       isEmailVerified: true,

@@ -29,12 +29,19 @@ export class User {
 
   @Prop()
   lastLoginAt?: Date;
+
+  @Prop()
+  kingschatUsername?: string;
+
+  @Prop()
+  avatar?: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
 // Indexes
 UserSchema.index({ email: 1 });
+UserSchema.index({ kingschatUsername: 1 });
 UserSchema.index({ roles: 1 });
 UserSchema.index({ createdAt: -1 });
 

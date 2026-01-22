@@ -196,6 +196,87 @@ export class AuthService {
     await this.userService.updateRefreshToken(userId, null);
   }
 
+  /**
+   * Authenticate user with KingsChat OAuth token
+   * Fetches user profile from KingsChat API and creates/updates user
+   */
+  async loginWithKingschat(accessToken: string) {
+    // Fetch user profile from KingsChat API
+    const kingsChatApiUrl = process.env.KINGSCHAT_API_URL || 'https://connect.kingsch.at/api/profile';
+
+    let kingsChatProfile: {
+      id: string;
+      username: string;
+      email?: string;
+      first_name?: string;
+      last_name?: string;
+      display_name?: string;
+      avatar?: string;
+      country?: string;
+    };
+
+    try {
+      const response = await fetch(kingsChatApiUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new UnauthorizedException('Failed to authenticate with KingsChat');
+      }
+
+      kingsChatProfile = await response.json();
+    } catch (error) {
+      this.logger.error('KingsChat API error:', error);
+      throw new UnauthorizedException('Failed to authenticate with KingsChat');
+    }
+
+    // Create or get user from KingsChat data
+    const fullName =
+      kingsChatProfile.display_name ||
+      [kingsChatProfile.first_name, kingsChatProfile.last_name]
+        .filter(Boolean)
+        .join(' ') ||
+      kingsChatProfile.username;
+
+    const user = await this.userService.createFromKingschat({
+      email:
+        kingsChatProfile.email ||
+        `${kingsChatProfile.username}@kingschat.user`,
+      fullName,
+      kingschatUsername: kingsChatProfile.username,
+      avatar: kingsChatProfile.avatar,
+    });
+
+    // Check if user is active
+    if (!user.isActive) {
+      throw new ForbiddenException('Account is deactivated');
+    }
+
+    const tokens = await this.generateTokens(user);
+
+    await this.userService.updateRefreshToken(
+      user._id.toString(),
+      tokens.refreshToken,
+    );
+    await this.userService.updateLastLogin(user._id.toString());
+
+    return {
+      user: {
+        id: user._id,
+        email: user.email,
+        fullName: user.fullName,
+        roles: user.roles,
+        isEmailVerified: user.isEmailVerified,
+        kingschatUsername: user.kingschatUsername,
+        avatar: user.avatar,
+      },
+      ...tokens,
+    };
+  }
+
   private async generateTokens(user: UserDocument) {
     const payload = {
       sub: user._id.toString(),
