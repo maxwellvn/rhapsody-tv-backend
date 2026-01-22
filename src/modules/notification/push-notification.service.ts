@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { DeviceToken, DeviceTokenDocument } from './schemas/device-token.schema';
 import { Notification, NotificationDocument, NotificationType } from './notification.schema';
+import { NotificationGateway } from './notification.gateway';
 import { Expo, ExpoPushMessage, ExpoPushTicket } from 'expo-server-sdk';
 
 @Injectable()
@@ -15,6 +16,8 @@ export class PushNotificationService {
     private deviceTokenModel: Model<DeviceTokenDocument>,
     @InjectModel(Notification.name)
     private notificationModel: Model<NotificationDocument>,
+    @Inject(forwardRef(() => NotificationGateway))
+    private notificationGateway: NotificationGateway,
   ) {
     this.expo = new Expo();
   }
@@ -246,7 +249,19 @@ export class PushNotificationService {
       imageUrl,
     });
 
-    // Send push notification
+    // Send via WebSocket (real-time, works in Expo Go)
+    this.notificationGateway.sendNotificationToUser(userId, {
+      _id: notification._id.toString(),
+      type,
+      title,
+      message,
+      data,
+      imageUrl,
+      isRead: false,
+      createdAt: notification.createdAt,
+    });
+
+    // Send push notification (for native builds)
     await this.sendToUser(userId, {
       title,
       body: message,
