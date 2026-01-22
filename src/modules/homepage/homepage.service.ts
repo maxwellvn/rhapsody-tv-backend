@@ -46,9 +46,12 @@ export class HomepageService {
   }
 
   private toProgramDto(program: ProgramDocument): HomepageProgramDto {
-    const populatedChannel = program.populated('channelId')
-      ? (program.channelId as unknown as ChannelDocument)
-      : undefined;
+    const channelValue = (program as unknown as { channelId?: unknown })
+      .channelId;
+    const populatedChannel =
+      channelValue && typeof channelValue === 'object' && 'name' in channelValue
+        ? (channelValue as ChannelDocument)
+        : undefined;
 
     return {
       id: program._id.toString(),
@@ -66,9 +69,12 @@ export class HomepageService {
   }
 
   toVideoDto(video: VideoDocument): HomepageVideoDto {
-    const populatedChannel = video.populated('channelId')
-      ? (video.channelId as unknown as ChannelDocument)
-      : undefined;
+    const channelValue = (video as unknown as { channelId?: unknown })
+      .channelId;
+    const populatedChannel =
+      channelValue && typeof channelValue === 'object' && 'name' in channelValue
+        ? (channelValue as ChannelDocument)
+        : undefined;
 
     return {
       id: video._id.toString(),
