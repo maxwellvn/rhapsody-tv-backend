@@ -105,91 +105,12 @@ export class KingsChatCallbackController {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>${isError ? 'Authentication Failed' : 'Redirecting...'}</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      background: linear-gradient(135deg, #0000FF 0%, #00008B 100%);
-      color: white;
-    }
-    .container {
-      text-align: center;
-      padding: 40px 20px;
-      max-width: 400px;
-    }
-    .spinner {
-      width: 50px;
-      height: 50px;
-      border: 4px solid rgba(255, 255, 255, 0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 20px;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    h1 {
-      font-size: 24px;
-      font-weight: 600;
-      margin-bottom: 12px;
-    }
-    p {
-      font-size: 16px;
-      opacity: 0.9;
-      margin-bottom: 30px;
-      line-height: 1.5;
-    }
-    .btn {
-      display: inline-block;
-      background: white;
-      color: #0000FF;
-      padding: 14px 28px;
-      text-decoration: none;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 16px;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    }
-    .logo {
-      font-size: 48px;
-      margin-bottom: 20px;
-    }
-    .error {
-      color: #FFD700;
-    }
-  </style>
+  <title>Redirecting...</title>
 </head>
 <body>
-  <div class="container">
-    <div class="logo">📺</div>
-    ${isError ? '<h1 class="error">Authentication Failed</h1>' : '<div class="spinner"></div><h1>Authentication Successful</h1>'}
-    <p>${isError ? 'There was a problem signing in with KingsChat. Please try again.' : 'Redirecting to the Rhapsody TV app...'}</p>
-    <a href="${deepLink}" class="btn">Open App</a>
-  </div>
   <script>
-    // Try to redirect immediately
-    window.location.href = "${deepLink}";
-
-    // Fallback: show error if redirect doesn't work after 2 seconds
-    setTimeout(function() {
-      if (window.location.href.indexOf('${deepLink.split('?')[0]}') === -1) {
-        document.querySelector('.spinner')?.style.display = 'none';
-      }
-    }, 2000);
+    // Immediate redirect - execute before page renders
+    window.location.replace("${deepLink}");
   </script>
 </body>
 </html>
