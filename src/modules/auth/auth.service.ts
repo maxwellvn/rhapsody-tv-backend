@@ -272,27 +272,34 @@ export class AuthService {
     avatar?: string;
   } | null> {
     try {
-      const response = await fetch('https://connect.kingsch.at/api/v1/users/me', {
+      const response = await fetch('https://connect.kingsch.at/api/profile', {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${accessToken}`,
         },
       });
 
       if (!response.ok) {
         this.logger.error(`KingsChat API error: ${response.status}`);
+        const errorText = await response.text();
+        this.logger.error(`KingsChat API response: ${errorText}`);
         return null;
       }
 
       const data = await response.json();
+      this.logger.log(`KingsChat profile data: ${JSON.stringify(data)}`);
+
+      // KingsChat returns profile in various formats, handle all cases
+      const profile = data.profile || data.user || data;
 
       return {
-        id: data.id || data.userId,
-        username: data.username,
-        displayName: data.displayName || data.display_name || data.name,
-        email: data.email,
-        avatar: data.avatar || data.profilePicture || data.profile_picture,
+        id: profile.user_id || profile.id || profile.userId,
+        username: profile.username || profile.user_name,
+        displayName: profile.display_name || profile.displayName || profile.name || profile.full_name || profile.username,
+        email: profile.email,
+        avatar: profile.avatar || profile.profile_picture || profile.profilePicture || profile.image,
       };
     } catch (error) {
       this.logger.error('Failed to fetch KingsChat profile:', error);
