@@ -265,7 +265,7 @@ export class AuthService {
 
     return {
       user: {
-        id: user._id,
+        id: user._id.toString(),
         email: user.email,
         fullName: user.fullName,
         roles: user.roles,
