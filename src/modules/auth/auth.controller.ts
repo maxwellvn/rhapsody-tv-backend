@@ -32,6 +32,8 @@ import {
   EmailOnlyResponseDto,
   RequestEmailVerificationDto,
   VerifyEmailDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
 } from './dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { Public, CurrentUser } from '../../common/decorators';
@@ -196,6 +198,42 @@ export class AuthController {
     return {
       success: true,
       message: 'Logout successful',
+    };
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request password reset' })
+  @ApiOkSuccessResponse({ description: 'Password reset email sent' })
+  @ApiResponse({ status: 400, description: 'Invalid email' })
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    const result = await this.authService.forgotPassword(forgotPasswordDto.email);
+    return {
+      success: true,
+      message: result.message,
+      data: {
+        email: result.email,
+        resetToken: result.resetToken, // Remove in production
+      },
+    };
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password with token' })
+  @ApiOkSuccessResponse({ description: 'Password reset successful' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+  @ApiResponse({ status: 422, description: 'Validation error' })
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    await this.authService.resetPassword(
+      resetPasswordDto.token,
+      resetPasswordDto.password,
+    );
+    return {
+      success: true,
+      message: 'Password reset successfully',
     };
   }
 }

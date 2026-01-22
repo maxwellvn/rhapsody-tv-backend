@@ -28,6 +28,13 @@ async function bootstrap() {
     }),
   );
 
+  // Serve public static files (includes PHP callback for KingsChat OAuth)
+  const publicPath = join(__dirname, '..', 'public');
+  if (existsSync(publicPath)) {
+    app.use(expressStatic(publicPath));
+    logger.log('Public static files configured');
+  }
+
   // Serve Admin SPA at /admin (before other routes)
   const adminPath = join(__dirname, '..', 'public', 'admin');
   if (existsSync(adminPath)) {
@@ -102,6 +109,7 @@ async function bootstrap() {
   await app.listen(port, '0.0.0.0');
   logger.log(`Application is running on: http://localhost:${port}`);
   logger.log(`Environment: ${nodeEnv}`);
+  logger.log(`KingsChat OAuth callback: http://localhost:${port}/auth/kingschat-callback.php`);
 }
 
 void bootstrap();

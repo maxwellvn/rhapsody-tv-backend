@@ -5,6 +5,8 @@ export * from './kingschat.dto';
 
 export * from './request-email-verification.dto';
 export * from './verify-email.dto';
+export * from './forgot-password.dto';
+export * from './reset-password.dto';
 
 export * from './auth-user.dto';
 export * from './auth-tokens.dto';

@@ -30,13 +30,25 @@ export class AuthService {
   ) {}
 
   private readonly emailVerificationTtlSeconds = 10 * 60;
+  private readonly passwordResetTtlSeconds = 60 * 60; // 1 hour
 
   private getEmailVerificationKey(email: string): string {
     return `email_verification:${email.toLowerCase()}`;
   }
 
+  private getPasswordResetKey(email: string): string {
+    return `password_reset:${email.toLowerCase()}`;
+  }
+
   private generateEmailVerificationCode(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  private generateResetToken(): string {
+    // Generate a random 32-byte hex string (64 characters)
+    return Array.from({ length: 64 }, () =>
+      Math.floor(Math.random() * 16).toString(16),
+    ).join('');
   }
 
   async validateUser(
@@ -326,6 +338,76 @@ export class AuthService {
     });
 
     return result;
+  }
+
+  /**
+   * Request password reset
+   * Generates a reset token and sends it via email
+   * Always returns success to prevent email enumeration
+   */
+  async forgotPassword(email: string): Promise<{ email?: string; resetToken?: string; message: string }> {
+    const user = await this.userService.findByEmailNoPassword(email);
+
+    if (!user) {
+      // Return success even if user doesn't exist (prevent email enumeration)
+      return {
+        message: 'If an account with that email exists, a reset link has been sent',
+      };
+    }
+
+    const resetToken = this.generateResetToken();
+    const emailKey = this.getPasswordResetKey(user.email);
+    const tokenKey = `password_reset_token:${resetToken}`;
+
+    // Store both mappings for efficient lookup
+    await this.redisService.set(emailKey, resetToken, this.passwordResetTtlSeconds);
+    await this.redisService.set(tokenKey, user.email, this.passwordResetTtlSeconds);
+
+    // Send password reset email
+    try {
+      await this.emailService.sendPasswordResetEmail(user.email, resetToken);
+      this.logger.log(`Password reset email sent to ${user.email}`);
+    } catch (error) {
+      this.logger.error(`Failed to send password reset email to ${user.email}:`, error);
+      // Continue - token is still stored in Redis
+    }
+
+    return {
+      email: user.email,
+      resetToken: resetToken, // Remove in production
+      message: 'If an account with that email exists, a reset link has been sent',
+    };
+  }
+
+  /**
+   * Reset password with token
+   */
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    // Find the reset token in Redis
+    const tokenKey = `password_reset_token:${token}`;
+    const email = await this.redisService.get(tokenKey);
+
+    if (!email) {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+
+    const user = await this.userService.findByEmailNoPassword(email as string);
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Update user password
+    await this.userService.updatePassword(user._id.toString(), newPassword);
+
+    // Delete the reset token
+    await this.redisService.del(tokenKey);
+    await this.redisService.del(this.getPasswordResetKey(user.email));
+
+    // Clear all refresh tokens for security
+    await this.userService.updateRefreshToken(user._id.toString(), null);
+
+    this.logger.log(`Password reset successful for ${user.email}`);
   }
 
   private async generateTokens(user: UserDocument) {

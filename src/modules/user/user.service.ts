@@ -137,18 +137,10 @@ export class UserService {
       fullName: data.fullName,
     });
 
-    // FIRST: Try to find by KingsChat ID (most reliable)
-    let existingUser = await this.findByKingschatId(data.kingschatId);
+    // Only match by KingsChat ID - each KingsChat account gets its own user
+    const existingUser = await this.findByKingschatId(data.kingschatId);
 
-    // SECOND: If not found by ID, try by username/email (legacy support)
-    if (!existingUser) {
-      existingUser = await this.findByKingschatUsernameOrEmail(
-        data.kingschatUsername,
-        data.email,
-      );
-    }
-
-    console.log('[UserService] Existing user found:', existingUser ? {
+    console.log('[UserService] Existing user found by kingschatId:', existingUser ? {
       id: existingUser._id.toString(),
       email: existingUser.email,
       kingschatId: existingUser.kingschatId,
@@ -184,9 +176,18 @@ export class UserService {
       12,
     );
 
+    // Check if email already exists - if so, generate a unique email for this KingsChat user
+    let emailToUse = data.email.toLowerCase();
+    const existingEmailUser = await this.findByEmail(emailToUse);
+    if (existingEmailUser) {
+      // Generate unique email using kingschatId to avoid conflicts
+      emailToUse = `${data.kingschatId}@kingschat.user`;
+      console.log('[UserService] Email conflict detected, using generated email:', emailToUse);
+    }
+
     try {
       const user = new this.userModel({
-        email: data.email.toLowerCase(),
+        email: emailToUse,
         fullName: data.fullName,
         kingschatId: data.kingschatId,
         kingschatUsername: data.kingschatUsername,
@@ -210,7 +211,7 @@ export class UserService {
         error: error.message,
         code: error.code,
         kingschatId: data.kingschatId,
-        email: data.email,
+        email: emailToUse,
       });
       throw error;
     }
@@ -219,6 +220,13 @@ export class UserService {
   async markEmailVerified(userId: string): Promise<void> {
     await this.userModel.findByIdAndUpdate(userId, {
       isEmailVerified: true,
+    });
+  }
+
+  async updatePassword(userId: string, newPassword: string): Promise<void> {
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    await this.userModel.findByIdAndUpdate(userId, {
+      password: hashedPassword,
     });
   }
 
