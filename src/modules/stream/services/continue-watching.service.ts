@@ -80,6 +80,29 @@ export class ContinueWatchingService {
       .exec();
   }
 
+  async getPaginatedByUserId(
+    userId: string,
+    page = 1,
+    limit = 20,
+  ): Promise<ContinueWatchingDocument[]> {
+    const safePage = Math.max(page, 1);
+    const safeLimit = Math.min(Math.max(limit, 1), 50);
+    const skip = (safePage - 1) * safeLimit;
+
+    const userObjectId = new Types.ObjectId(userId);
+    return this.continueWatchingModel
+      .find({ userId: userObjectId })
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(safeLimit)
+      .exec();
+  }
+
+  async countByUserId(userId: string): Promise<number> {
+    const userObjectId = new Types.ObjectId(userId);
+    return this.continueWatchingModel.countDocuments({ userId: userObjectId });
+  }
+
   /**
    * Remove a continue watching entry
    */
@@ -91,5 +114,13 @@ export class ContinueWatchingService {
       userId: userObjectId,
       videoId: videoObjectId,
     });
+  }
+
+  /**
+   * Clear all continue watching entries for a user
+   */
+  async clearByUserId(userId: string): Promise<void> {
+    const userObjectId = new Types.ObjectId(userId);
+    await this.continueWatchingModel.deleteMany({ userId: userObjectId });
   }
 }

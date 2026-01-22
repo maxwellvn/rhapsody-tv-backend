@@ -23,6 +23,9 @@ import {
   UpdateUserDto,
   UserResponseDto,
   PaginatedUsersResponseDto,
+  AddToWatchlistDto,
+  PaginatedWatchlistResponseDto,
+  PaginatedWatchHistoryResponseDto,
 } from './dto';
 import { Roles, CurrentUser } from '../../common/decorators';
 import { Role } from '../../shared/enums/role.enum';
@@ -31,12 +34,18 @@ import {
   ApiCreatedSuccessResponse,
   ApiOkSuccessResponse,
 } from '../../common/swagger';
+import { WatchlistService } from './watchlist.service';
+import { WatchHistoryService } from './watch-history.service';
 
 @ApiTags('Users')
 @ApiBearerAuth()
 @Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly watchlistService: WatchlistService,
+    private readonly watchHistoryService: WatchHistoryService,
+  ) {}
 
   @Post()
   @Roles(Role.ADMIN)
@@ -128,6 +137,117 @@ export class UserController {
       success: true,
       message: 'Profile updated successfully',
       data: updatedUser,
+    };
+  }
+
+  @Get('me/watchlist')
+  @ApiOperation({ summary: 'Get current user watchlist' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiOkSuccessResponse({
+    description: 'Watchlist retrieved successfully',
+    model: PaginatedWatchlistResponseDto,
+  })
+  async getWatchlist(
+    @CurrentUser('sub') userId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    const data = await this.watchlistService.listPaginated(userId, page, limit);
+    return {
+      success: true,
+      message: 'Watchlist retrieved successfully',
+      data,
+    };
+  }
+
+  @Post('me/watchlist')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Add a video to current user watchlist' })
+  @ApiOkSuccessResponse({
+    description: 'Video added to watchlist successfully',
+  })
+  async addToWatchlist(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: AddToWatchlistDto,
+  ) {
+    await this.watchlistService.add(userId, dto.videoId);
+    return {
+      success: true,
+      message: 'Video added to watchlist successfully',
+    };
+  }
+
+  @Delete('me/watchlist/:videoId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Remove a video from current user watchlist' })
+  @ApiOkSuccessResponse({
+    description: 'Video removed from watchlist successfully',
+  })
+  async removeFromWatchlist(
+    @CurrentUser('sub') userId: string,
+    @Param('videoId') videoId: string,
+  ) {
+    await this.watchlistService.remove(userId, videoId);
+    return {
+      success: true,
+      message: 'Video removed from watchlist successfully',
+    };
+  }
+
+  @Get('me/history')
+  @ApiOperation({ summary: 'Get current user watch history' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiOkSuccessResponse({
+    description: 'Watch history retrieved successfully',
+    model: PaginatedWatchHistoryResponseDto,
+  })
+  async getWatchHistory(
+    @CurrentUser('sub') userId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    const data = await this.watchHistoryService.listPaginated(
+      userId,
+      page,
+      limit,
+    );
+    return {
+      success: true,
+      message: 'Watch history retrieved successfully',
+      data,
+    };
+  }
+
+  @Delete('me/history/:videoId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Remove a video from current user watch history' })
+  @ApiOkSuccessResponse({
+    description: 'Video removed from watch history successfully',
+  })
+  async removeFromWatchHistory(
+    @CurrentUser('sub') userId: string,
+    @Param('videoId') videoId: string,
+  ) {
+    await this.watchHistoryService.remove(userId, videoId);
+    return {
+      success: true,
+      message: 'Video removed from watch history successfully',
+    };
+  }
+
+  @Delete('me/history')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Clear current user watch history' })
+  @ApiOkSuccessResponse({
+    description: 'Watch history cleared successfully',
+  })
+  async clearWatchHistory(@CurrentUser('sub') userId: string) {
+    await this.watchHistoryService.clear(userId);
+    return {
+      success: true,
+      message: 'Watch history cleared successfully',
     };
   }
 
