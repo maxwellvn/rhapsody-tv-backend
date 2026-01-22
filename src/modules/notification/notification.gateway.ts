@@ -174,4 +174,19 @@ export class NotificationGateway
   isUserConnected(userId: string): boolean {
     return this.userSockets.has(userId) && this.userSockets.get(userId)!.size > 0;
   }
+
+  /**
+   * Broadcast notification to all connected users
+   */
+  broadcastNotification(notification: any): void {
+    this.server.emit(NOTIFICATION_WS_EVENTS.NEW_NOTIFICATION, notification);
+    this.logger.log(`Broadcast notification to all connected users`);
+  }
+
+  /**
+   * Get all connected user IDs
+   */
+  getConnectedUserIds(): string[] {
+    return Array.from(this.userSockets.keys());
+  }
 }

@@ -302,9 +302,28 @@ export class PushNotificationService {
       imageUrl,
     }));
 
-    await this.notificationModel.insertMany(notifications);
+    const createdNotifications = await this.notificationModel.insertMany(notifications);
 
-    // Send push notifications
+    // Send via WebSocket to all users (real-time, works in Expo Go)
+    const notificationPayload = {
+      type,
+      title,
+      message,
+      data,
+      imageUrl,
+      isRead: false,
+      createdAt: new Date(),
+    };
+    
+    // Send to each user with their specific notification ID
+    createdNotifications.forEach((notification, index) => {
+      this.notificationGateway.sendNotificationToUser(userIds[index], {
+        _id: notification._id.toString(),
+        ...notificationPayload,
+      });
+    });
+
+    // Send push notifications (for native builds)
     await this.sendToUsers(userIds, {
       title,
       body: message,
@@ -328,8 +347,19 @@ export class PushNotificationService {
     },
     imageUrl?: string,
   ): Promise<{ sent: number; failed: number }> {
+    // Broadcast via WebSocket to all connected users (real-time, works in Expo Go)
+    this.notificationGateway.broadcastNotification({
+      type,
+      title,
+      message,
+      data,
+      imageUrl,
+      isRead: false,
+      createdAt: new Date(),
+    });
+
     // For broadcast, we create notifications when users fetch them
-    // Just send push notifications
+    // Send push notifications (for native builds)
     return this.broadcast({
       title,
       body: message,
