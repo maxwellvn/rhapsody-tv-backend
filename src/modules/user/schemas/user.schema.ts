@@ -9,11 +9,11 @@ export class User {
   @Prop({ required: true, trim: true })
   fullName: string;
 
-  @Prop({ required: true, lowercase: true, trim: true })
-  email: string;
+  @Prop({ lowercase: true, trim: true, sparse: true })
+  email?: string;
 
-  @Prop({ required: true, select: false })
-  password: string;
+  @Prop({ select: false })
+  password?: string;
 
   @Prop({ type: [String], enum: Role, default: [Role.USER] })
   roles: Role[];
@@ -29,14 +29,25 @@ export class User {
 
   @Prop()
   lastLoginAt?: Date;
+
+  // KingsChat OAuth fields
+  @Prop({ sparse: true, unique: true })
+  kingsChatId?: string;
+
+  @Prop()
+  username?: string;
+
+  @Prop()
+  avatar?: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
 // Indexes
-UserSchema.index({ email: 1 });
+UserSchema.index({ email: 1 }, { sparse: true });
 UserSchema.index({ roles: 1 });
 UserSchema.index({ createdAt: -1 });
+UserSchema.index({ kingsChatId: 1 }, { sparse: true });
 
 // Ensure virtuals are included in JSON output
 UserSchema.set('toJSON', {

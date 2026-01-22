@@ -133,4 +133,51 @@ export class UserService {
 
     return bcrypt.compare(refreshToken, user.refreshToken);
   }
+
+  // KingsChat methods
+  async findByKingsChatId(kingsChatId: string): Promise<UserDocument | null> {
+    return this.userModel.findOne({ kingsChatId });
+  }
+
+  async linkKingsChatId(userId: string, kingsChatId: string): Promise<void> {
+    await this.userModel.findByIdAndUpdate(userId, { kingsChatId });
+  }
+
+  async createFromKingsChat(data: {
+    kingsChatId: string;
+    fullName: string;
+    email?: string;
+    avatar?: string;
+    username?: string;
+  }): Promise<UserDocument> {
+    // Check if kingsChatId already exists
+    const existingUser = await this.findByKingsChatId(data.kingsChatId);
+    if (existingUser) {
+      throw new ConflictException('User with this KingsChat ID already exists');
+    }
+
+    // Check if email exists (if provided)
+    if (data.email) {
+      const emailUser = await this.userModel.findOne({
+        email: data.email.toLowerCase(),
+      });
+      if (emailUser) {
+        // Link KingsChat to existing account instead
+        await this.linkKingsChatId(emailUser._id.toString(), data.kingsChatId);
+        return emailUser;
+      }
+    }
+
+    const user = new this.userModel({
+      fullName: data.fullName,
+      email: data.email?.toLowerCase(),
+      kingsChatId: data.kingsChatId,
+      username: data.username,
+      avatar: data.avatar,
+      isEmailVerified: true, // KingsChat users are considered verified
+      isActive: true,
+    });
+
+    return user.save();
+  }
 }

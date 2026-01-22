@@ -5,12 +5,14 @@ import {
   ForbiddenException,
   NotFoundException,
   Logger,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { ConfigType } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { UserService } from '../user/user.service';
 import { RegisterDto } from './dto/register.dto';
+import { KingsChatLoginDto } from './dto/kingschat-login.dto';
 import jwtConfig from '../../config/jwt.config';
 import { UserDocument } from '../user/schemas/user.schema';
 import { RedisService } from '../../shared/services/redis';
@@ -45,7 +47,7 @@ export class AuthService {
   ): Promise<UserDocument | null> {
     const user = await this.userService.findByEmail(email);
 
-    if (!user) {
+    if (!user || !user.password) {
       return null;
     }
 
@@ -90,7 +92,7 @@ export class AuthService {
   async requestEmailVerification(email: string): Promise<{ email: string }> {
     const user = await this.userService.findByEmailNoPassword(email);
 
-    if (!user) {
+    if (!user || !user.email) {
       throw new NotFoundException('User not found');
     }
 
@@ -120,7 +122,7 @@ export class AuthService {
   async verifyEmail(email: string, code: string): Promise<void> {
     const user = await this.userService.findByEmailNoPassword(email);
 
-    if (!user) {
+    if (!user || !user.email) {
       throw new NotFoundException('User not found');
     }
 
@@ -148,15 +150,15 @@ export class AuthService {
       tokens.refreshToken,
     );
 
-    // Send verification email after registration
-    try {
+    // Send verification email after registration (fire and forget - don't block response)
+    if (user.email) {
       const code = this.generateEmailVerificationCode();
       const key = this.getEmailVerificationKey(user.email);
-      await this.redisService.set(key, code, this.emailVerificationTtlSeconds);
-      await this.emailService.sendVerificationEmail(user.email, code);
-      this.logger.log(`Verification email sent to ${user.email} after registration`);
-    } catch (error) {
-      this.logger.error(`Failed to send verification email to ${user.email}:`, error);
+      const userEmail = user.email;
+      this.redisService.set(key, code, this.emailVerificationTtlSeconds)
+        .then(() => this.emailService.sendVerificationEmail(userEmail, code))
+        .then(() => this.logger.log(`Verification email sent to ${userEmail} after registration`))
+        .catch((error) => this.logger.error(`Failed to send verification email to ${userEmail}:`, error));
     }
 
     return {
@@ -194,6 +196,108 @@ export class AuthService {
 
   async logout(userId: string) {
     await this.userService.updateRefreshToken(userId, null);
+  }
+
+  /**
+   * Login or register user via KingsChat OAuth
+   */
+  async loginWithKingsChat(kingsChatLoginDto: KingsChatLoginDto) {
+    const { accessToken } = kingsChatLoginDto;
+
+    // Fetch user profile from KingsChat API
+    const kingsChatProfile = await this.fetchKingsChatProfile(accessToken);
+
+    if (!kingsChatProfile || !kingsChatProfile.id) {
+      throw new BadRequestException('Failed to fetch KingsChat profile');
+    }
+
+    // Check if user already exists with this KingsChat ID
+    let user = await this.userService.findByKingsChatId(kingsChatProfile.id);
+
+    if (!user) {
+      // Check if user exists with the same email (if email is provided)
+      if (kingsChatProfile.email) {
+        user = await this.userService.findByEmail(kingsChatProfile.email);
+        if (user) {
+          // Link KingsChat ID to existing account
+          await this.userService.linkKingsChatId(user._id.toString(), kingsChatProfile.id);
+        }
+      }
+
+      // Create new user if not found
+      if (!user) {
+        user = await this.userService.createFromKingsChat({
+          kingsChatId: kingsChatProfile.id,
+          fullName: kingsChatProfile.displayName || kingsChatProfile.username,
+          email: kingsChatProfile.email,
+          avatar: kingsChatProfile.avatar,
+          username: kingsChatProfile.username,
+        });
+      }
+    }
+
+    if (!user.isActive) {
+      throw new ForbiddenException('Account is deactivated');
+    }
+
+    const tokens = await this.generateTokens(user);
+
+    await this.userService.updateRefreshToken(
+      user._id.toString(),
+      tokens.refreshToken,
+    );
+    await this.userService.updateLastLogin(user._id.toString());
+
+    return {
+      user: {
+        id: user._id,
+        email: user.email,
+        fullName: user.fullName,
+        roles: user.roles,
+        isEmailVerified: user.isEmailVerified,
+        avatar: user.avatar,
+      },
+      ...tokens,
+    };
+  }
+
+  /**
+   * Fetch user profile from KingsChat API
+   */
+  private async fetchKingsChatProfile(accessToken: string): Promise<{
+    id: string;
+    username: string;
+    displayName: string;
+    email?: string;
+    avatar?: string;
+  } | null> {
+    try {
+      const response = await fetch('https://connect.kingsch.at/api/v1/users/me', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        this.logger.error(`KingsChat API error: ${response.status}`);
+        return null;
+      }
+
+      const data = await response.json();
+
+      return {
+        id: data.id || data.userId,
+        username: data.username,
+        displayName: data.displayName || data.display_name || data.name,
+        email: data.email,
+        avatar: data.avatar || data.profilePicture || data.profile_picture,
+      };
+    } catch (error) {
+      this.logger.error('Failed to fetch KingsChat profile:', error);
+      return null;
+    }
   }
 
   private async generateTokens(user: UserDocument) {

@@ -31,6 +31,7 @@ import {
   EmailOnlyResponseDto,
   RequestEmailVerificationDto,
   VerifyEmailDto,
+  KingsChatLoginDto,
 } from './dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { Public, CurrentUser } from '../../common/decorators';
@@ -73,6 +74,25 @@ export class AuthController {
     return {
       success: true,
       message: 'Login successful',
+      data: result,
+    };
+  }
+
+  @Public()
+  @Post('kingschat')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login or register with KingsChat' })
+  @ApiBody({ type: KingsChatLoginDto })
+  @ApiOkSuccessResponse({
+    description: 'KingsChat login successful',
+    model: AuthLoginResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Failed to fetch KingsChat profile' })
+  async loginWithKingsChat(@Body() kingsChatLoginDto: KingsChatLoginDto) {
+    const result = await this.authService.loginWithKingsChat(kingsChatLoginDto);
+    return {
+      success: true,
+      message: 'KingsChat login successful',
       data: result,
     };
   }
