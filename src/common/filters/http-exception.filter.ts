@@ -6,13 +6,16 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
 
-  catch(exception: unknown, host: ArgumentsHost) {
+  constructor(private readonly configService: ConfigService) {}
+
+  async catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
@@ -47,6 +50,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       );
     }
 
+    await this.sendToDiscord({
+      status,
+      message,
+      path: request.url,
+      method: request.method,
+      timestamp: new Date().toISOString(),
+      stack: exception instanceof Error ? exception.stack : undefined,
+      errors,
+    });
+
     response.status(status).json({
       success: false,
       statusCode: status,
@@ -55,5 +68,50 @@ export class HttpExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
     });
+  }
+
+  private async sendToDiscord(payload: {
+    status: number;
+    message: string;
+    path: string;
+    method: string;
+    timestamp: string;
+    stack?: string;
+    errors: unknown;
+  }) {
+    const webhookUrl = this.configService.get<string>('app.discordWebhookUrl');
+    if (!webhookUrl) {
+      return;
+    }
+
+    const { status, message, path, method, timestamp, stack, errors } = payload;
+    const content = [
+      `**Server Error**`,
+      `Status: ${status}`,
+      `Message: ${message}`,
+      `Path: ${method} ${path}`,
+      `Time: ${timestamp}`,
+      stack ? `Stack: ${'```'}${stack}${'```'}` : null,
+      errors
+        ? `Errors: ${'```json'}\n${JSON.stringify(errors, null, 2)}\n${'```'}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    try {
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content }),
+      });
+    } catch (err) {
+      this.logger.error(
+        'Failed to send Discord webhook',
+        err instanceof Error ? err.stack : String(err),
+      );
+    }
   }
 }

@@ -63,6 +63,9 @@ async function bootstrap() {
     logger.log(
       `Swagger documentation available at http://localhost:${port}/v1/docs`,
     );
+    logger.log(
+      `Swagger JSON documentation available at http://localhost:${port}/v1/docs-json`,
+    );
   }
 
   await app.listen(port, '0.0.0.0');
