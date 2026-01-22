@@ -184,26 +184,36 @@ export class UserService {
       12,
     );
 
-    const user = new this.userModel({
-      email: data.email.toLowerCase(),
-      fullName: data.fullName,
-      kingschatId: data.kingschatId,
-      kingschatUsername: data.kingschatUsername,
-      avatar: data.avatar,
-      password: randomPassword,
-      isEmailVerified: true, // Auto-verify KingsChat users
-      isActive: true,
-    });
+    try {
+      const user = new this.userModel({
+        email: data.email.toLowerCase(),
+        fullName: data.fullName,
+        kingschatId: data.kingschatId,
+        kingschatUsername: data.kingschatUsername,
+        avatar: data.avatar,
+        password: randomPassword,
+        isEmailVerified: true, // Auto-verify KingsChat users
+        isActive: true,
+      });
 
-    const savedUser = await user.save();
-    console.log('[UserService] New user created:', {
-      id: savedUser._id.toString(),
-      email: savedUser.email,
-      kingschatId: savedUser.kingschatId,
-      kingschatUsername: savedUser.kingschatUsername,
-    });
+      const savedUser = await user.save();
+      console.log('[UserService] New user created:', {
+        id: savedUser._id.toString(),
+        email: savedUser.email,
+        kingschatId: savedUser.kingschatId,
+        kingschatUsername: savedUser.kingschatUsername,
+      });
 
-    return savedUser;
+      return savedUser;
+    } catch (error: any) {
+      console.error('[UserService] Error creating user:', {
+        error: error.message,
+        code: error.code,
+        kingschatId: data.kingschatId,
+        email: data.email,
+      });
+      throw error;
+    }
   }
 
   async markEmailVerified(userId: string): Promise<void> {
