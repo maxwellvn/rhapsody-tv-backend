@@ -37,3 +37,14 @@ export class ChannelSubscriptionResponseDto {
   @ApiProperty({ example: true })
   notifyOnNewProgram: boolean;
 }
+
+export class CheckSubscriptionResponseDto {
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  channelId: string;
+
+  @ApiProperty({ example: true })
+  isSubscribed: boolean;
+
+  @ApiPropertyOptional({ type: ChannelSubscriptionResponseDto, nullable: true })
+  subscription: ChannelSubscriptionResponseDto | null;
+}

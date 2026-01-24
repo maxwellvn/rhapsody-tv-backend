@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -15,6 +15,7 @@ import {
 } from './schemas/channel-subscription.schema';
 import {
   ChannelSubscriptionResponseDto,
+  CheckSubscriptionResponseDto,
   UpdateChannelSubscriptionSettingsDto,
 } from './dto';
 
@@ -26,6 +27,37 @@ export class SubscriptionsController {
     @InjectModel(ChannelSubscription.name)
     private readonly subscriptionModel: Model<ChannelSubscriptionDocument>,
   ) {}
+
+  @Get('channels/:channelId')
+  @ApiOperation({
+    summary: 'Check if the current user is subscribed to a channel',
+  })
+  @ApiParam({ name: 'channelId', description: 'Channel ID' })
+  @ApiOkSuccessResponse({
+    description: 'Subscription status retrieved successfully',
+    model: CheckSubscriptionResponseDto,
+  })
+  async checkSubscription(
+    @CurrentUser('sub') userId: string,
+    @Param('channelId') channelId: string,
+  ) {
+    const subscription = await this.subscriptionModel.findOne({
+      userId: new Types.ObjectId(userId),
+      channelId: new Types.ObjectId(channelId),
+    });
+
+    const isSubscribed = subscription?.isSubscribed ?? false;
+
+    return {
+      success: true,
+      message: 'Subscription status retrieved successfully',
+      data: {
+        channelId,
+        isSubscribed,
+        subscription: subscription ? this.toResponse(subscription) : null,
+      },
+    };
+  }
 
   @Post('channels/:channelId')
   @ApiOperation({
