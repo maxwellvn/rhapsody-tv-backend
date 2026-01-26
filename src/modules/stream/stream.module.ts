@@ -11,6 +11,10 @@ import {
   LiveStreamBan,
   LiveStreamBanSchema,
 } from './schemas/live-stream-ban.schema';
+import {
+  LiveStreamLike,
+  LiveStreamLikeSchema,
+} from './schemas/live-stream-like.schema';
 import { Video, VideoSchema } from './schemas/video.schema';
 import {
   ContinueWatching,
@@ -19,6 +23,7 @@ import {
 import { LivestreamGateway } from './gateways/livestream.gateway';
 import { LivestreamChatService } from './services/livestream-chat.service';
 import { LivestreamViewerService } from './services/livestream-viewer.service';
+import { LivestreamLikeService } from './services/livestream-like.service';
 import { ContinueWatchingService } from './services/continue-watching.service';
 import jwtConfig from '../../config/jwt.config';
 
@@ -28,6 +33,7 @@ import jwtConfig from '../../config/jwt.config';
       { name: LiveStream.name, schema: LiveStreamSchema },
       { name: LiveStreamComment.name, schema: LiveStreamCommentSchema },
       { name: LiveStreamBan.name, schema: LiveStreamBanSchema },
+      { name: LiveStreamLike.name, schema: LiveStreamLikeSchema },
       { name: Video.name, schema: VideoSchema },
       { name: ContinueWatching.name, schema: ContinueWatchingSchema },
     ]),
@@ -44,12 +50,14 @@ import jwtConfig from '../../config/jwt.config';
     LivestreamGateway,
     LivestreamChatService,
     LivestreamViewerService,
+    LivestreamLikeService,
     ContinueWatchingService,
   ],
   exports: [
     MongooseModule,
     LivestreamChatService,
     LivestreamViewerService,
+    LivestreamLikeService,
     ContinueWatchingService,
   ],
 })

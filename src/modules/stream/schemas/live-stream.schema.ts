@@ -51,6 +51,9 @@ export class LiveStream {
 
   @Prop({ default: false })
   isChatEnabled: boolean;
+
+  @Prop({ default: 0 })
+  likeCount: number;
 }
 
 export const LiveStreamSchema = SchemaFactory.createForClass(LiveStream);

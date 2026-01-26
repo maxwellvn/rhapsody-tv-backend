@@ -20,12 +20,14 @@ import {
   CommentWithUser,
 } from '../services/livestream-chat.service';
 import { LivestreamViewerService } from '../services/livestream-viewer.service';
+import { LivestreamLikeService } from '../services/livestream-like.service';
 import {
   SendCommentDto,
   BanUserDto,
   JoinLivestreamDto,
   DeleteCommentDto,
 } from '../dto';
+import { ToggleLikeDto } from '../dto/toggle-like.dto';
 import { Role } from '../../../shared/enums/role.enum';
 
 interface AuthenticatedSocket extends Socket {
@@ -44,6 +46,7 @@ const WS_EVENTS = {
   DELETE_COMMENT: 'deleteComment',
   BAN_USER: 'banUser',
   UNBAN_USER: 'unbanUser',
+  TOGGLE_LIKE: 'toggleLike',
 
   // Server -> Client
   NEW_COMMENT: 'newComment',
@@ -52,6 +55,8 @@ const WS_EVENTS = {
   COMMENT_HISTORY: 'commentHistory',
   USER_BANNED: 'userBanned',
   USER_UNBANNED: 'userUnbanned',
+  UPDATE_LIKE_COUNT: 'updateLikeCount',
+  USER_LIKE_STATUS: 'userLikeStatus',
   ERROR: 'error',
 } as const;
 
@@ -74,6 +79,7 @@ export class LivestreamGateway
     private readonly jwtService: JwtService,
     private readonly chatService: LivestreamChatService,
     private readonly viewerService: LivestreamViewerService,
+    private readonly likeService: LivestreamLikeService,
   ) {}
 
   /**
@@ -190,6 +196,20 @@ export class LivestreamGateway
     );
     client.emit(WS_EVENTS.COMMENT_HISTORY, { comments: recentComments });
 
+    // Send the current user's like status and current total count
+    const [hasLiked, likeCount] = await Promise.all([
+      this.likeService.hasUserLiked(livestreamId, userId),
+      this.likeService.getLikeCount(livestreamId),
+    ]);
+
+    client.emit(WS_EVENTS.USER_LIKE_STATUS, { livestreamId, hasLiked });
+
+    // We can also send the current count to ensure sync
+    client.emit(WS_EVENTS.UPDATE_LIKE_COUNT, {
+      livestreamId,
+      count: likeCount,
+    });
+
     this.logger.log(`User ${userId} joined livestream ${livestreamId}`);
   }
 
@@ -267,6 +287,46 @@ export class LivestreamGateway
 
     this.logger.log(
       `User ${userId} sent comment in livestream ${livestreamId}`,
+    );
+  }
+
+  /**
+   * Toggle like on a livestream
+   */
+  @UseGuards(WsJwtAuthGuard)
+  @UsePipes(new ValidationPipe({ transform: true }))
+  @SubscribeMessage(WS_EVENTS.TOGGLE_LIKE)
+  async handleToggleLike(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: ToggleLikeDto,
+  ): Promise<void> {
+    const userId = client.data.user.sub;
+    const { livestreamId } = data;
+
+    // We don't necessarily need to check chatEnabled for likes, unless desired.
+    // But we should check if livestream exists.
+    const livestreamInfo =
+      await this.chatService.isLivestreamValid(livestreamId);
+
+    if (!livestreamInfo.exists) {
+      throw new WsException('Livestream not found');
+    }
+
+    // Allow banned users to like? Assuming yes for now, usually bans are for chat.
+
+    const { likeCount, hasLiked } = await this.likeService.toggleLike(
+      livestreamId,
+      userId,
+    );
+
+    // Notify the user of their new status
+    client.emit(WS_EVENTS.USER_LIKE_STATUS, { livestreamId, hasLiked });
+
+    // Broadcast new count to all users in the room
+    this.broadcastLikeCount(livestreamId, likeCount);
+
+    this.logger.log(
+      `User ${userId} toggled like (Active: ${hasLiked}) for livestream ${livestreamId}`,
     );
   }
 
@@ -405,6 +465,16 @@ export class LivestreamGateway
   private broadcastViewerCount(livestreamId: string, count: number): void {
     const roomName = this.getRoomName(livestreamId);
     this.server.to(roomName).emit(WS_EVENTS.VIEWER_COUNT, { count });
+  }
+
+  /**
+   * Broadcast like count to all users in a livestream room
+   */
+  private broadcastLikeCount(livestreamId: string, count: number): void {
+    const roomName = this.getRoomName(livestreamId);
+    this.server
+      .to(roomName)
+      .emit(WS_EVENTS.UPDATE_LIKE_COUNT, { livestreamId, count });
   }
 
   /**
