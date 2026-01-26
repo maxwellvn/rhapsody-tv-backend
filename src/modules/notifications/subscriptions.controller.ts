@@ -46,7 +46,8 @@ export class SubscriptionsController {
       channelId: new Types.ObjectId(channelId),
     });
 
-    const isSubscribed = subscription?.isSubscribed ?? false;
+    // If subscription record exists, the user is subscribed
+    const isSubscribed = !!subscription;
 
     return {
       success: true,
@@ -72,13 +73,18 @@ export class SubscriptionsController {
     @CurrentUser('sub') userId: string,
     @Param('channelId') channelId: string,
   ) {
+    const userObjectId = new Types.ObjectId(userId);
+    const channelObjectId = new Types.ObjectId(channelId);
+
     const updated = await this.subscriptionModel.findOneAndUpdate(
       {
-        userId: new Types.ObjectId(userId),
-        channelId: new Types.ObjectId(channelId),
+        userId: userObjectId,
+        channelId: channelObjectId,
       },
       {
         $setOnInsert: {
+          userId: userObjectId,
+          channelId: channelObjectId,
           notifyOnNewVideo: true,
           notifyOnGoLive: true,
           notifyOnNewProgram: true,
@@ -92,7 +98,7 @@ export class SubscriptionsController {
 
     return {
       success: true,
-      message: 'Subscription updated successfully',
+      message: 'Subscribed to channel successfully',
       data: this.toResponse(updated),
     };
   }
@@ -101,26 +107,28 @@ export class SubscriptionsController {
   @ApiOperation({ summary: 'Unsubscribe from a channel' })
   @ApiParam({ name: 'channelId', description: 'Channel ID' })
   @ApiOkSuccessResponse({
-    description: 'Subscription updated successfully',
+    description: 'Unsubscribed from channel successfully',
     model: ChannelSubscriptionResponseDto,
   })
   async unsubscribe(
     @CurrentUser('sub') userId: string,
     @Param('channelId') channelId: string,
   ) {
-    const updated = await this.subscriptionModel.findOneAndUpdate(
-      {
-        userId: new Types.ObjectId(userId),
-        channelId: new Types.ObjectId(channelId),
-      },
-      { $set: { isSubscribed: false } },
-      { new: true },
-    );
+    const userObjectId = new Types.ObjectId(userId);
+    const channelObjectId = new Types.ObjectId(channelId);
+
+    // Delete the subscription record instead of just setting isSubscribed to false
+    const deleted = await this.subscriptionModel.findOneAndDelete({
+      userId: userObjectId,
+      channelId: channelObjectId,
+    });
 
     return {
       success: true,
-      message: 'Subscription updated successfully',
-      data: updated ? this.toResponse(updated) : undefined,
+      message: 'Unsubscribed from channel successfully',
+      data: deleted
+        ? { ...this.toResponse(deleted), isSubscribed: false }
+        : undefined,
     };
   }
 
@@ -138,14 +146,22 @@ export class SubscriptionsController {
     @Param('channelId') channelId: string,
     @Body() dto: UpdateChannelSubscriptionSettingsDto,
   ) {
+    const userObjectId = new Types.ObjectId(userId);
+    const channelObjectId = new Types.ObjectId(channelId);
+
     const updated = await this.subscriptionModel.findOneAndUpdate(
       {
-        userId: new Types.ObjectId(userId),
-        channelId: new Types.ObjectId(channelId),
+        userId: userObjectId,
+        channelId: channelObjectId,
       },
       {
         $setOnInsert: {
+          userId: userObjectId,
+          channelId: channelObjectId,
           isSubscribed: true,
+          notifyOnNewVideo: true,
+          notifyOnGoLive: true,
+          notifyOnNewProgram: true,
         },
         $set: {
           ...(dto.notifyOnNewVideo !== undefined
