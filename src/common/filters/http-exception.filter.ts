@@ -50,15 +50,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
       );
     }
 
-    await this.sendToDiscord({
-      status,
-      message,
-      path: request.url,
-      method: request.method,
-      timestamp: new Date().toISOString(),
-      stack: exception instanceof Error ? exception.stack : undefined,
-      errors,
-    });
+    // Only send 5xx errors to Discord
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      await this.sendToDiscord({
+        status,
+        message,
+        path: request.url,
+        method: request.method,
+        timestamp: new Date().toISOString(),
+        stack: exception instanceof Error ? exception.stack : undefined,
+        errors,
+      });
+    }
 
     response.status(status).json({
       success: false,
