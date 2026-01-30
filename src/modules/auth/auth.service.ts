@@ -155,8 +155,13 @@ export class AuthService {
       tokens.refreshToken,
     );
 
-    // Send verification email
-    await this.requestEmailVerification(user.email);
+    // Send verification email (non-blocking - user can request again if it fails)
+    try {
+      await this.requestEmailVerification(user.email);
+    } catch (error) {
+      // Log but don't fail registration - user can request verification again
+      console.error('Failed to send verification email during registration:', error);
+    }
 
     return {
       user: {
