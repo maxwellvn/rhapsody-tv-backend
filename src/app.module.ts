@@ -28,6 +28,7 @@ import { HomepageModule } from './modules/homepage';
 import { VodModule } from './modules/vod';
 import { ChannelModule } from './modules/channel';
 import { NotificationsModule } from './modules/notifications';
+import { MailModule } from './modules/mail/mail.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { NotificationsModule } from './modules/notifications';
     NotificationsModule,
     HomepageModule,
     VodModule,
+    MailModule,
   ],
   providers: [
     // Global Exception Filter

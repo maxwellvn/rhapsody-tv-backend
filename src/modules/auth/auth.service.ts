@@ -14,12 +14,15 @@ import jwtConfig from '../../config/jwt.config';
 import { UserDocument } from '../user/schemas/user.schema';
 import { RedisService } from '../../shared/services/redis';
 
+import { MailService } from '../mail/mail.service';
+
 @Injectable()
 export class AuthService {
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly redisService: RedisService,
+    private readonly mailService: MailService,
     @Inject(jwtConfig.KEY)
     private readonly config: ConfigType<typeof jwtConfig>,
   ) {}
@@ -98,6 +101,24 @@ export class AuthService {
 
     await this.redisService.set(key, code, this.emailVerificationTtlSeconds);
 
+    const subject = 'Verify your email address';
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2>Verify your email address</h2>
+        <p>Your verification code is:</p>
+        <h1 style="color: #4CAF50; letter-spacing: 5px;">${code}</h1>
+        <p>This code will expire in 10 minutes.</p>
+        <p>If you didn't request this, please ignore this email.</p>
+      </div>
+    `;
+
+    await this.mailService.sendEmail(
+      user.email,
+      subject,
+      htmlBody,
+      user.fullName,
+    );
+
     return {
       email: user.email,
     };
@@ -133,6 +154,9 @@ export class AuthService {
       user._id.toString(),
       tokens.refreshToken,
     );
+
+    // Send verification email
+    await this.requestEmailVerification(user.email);
 
     return {
       user: {
