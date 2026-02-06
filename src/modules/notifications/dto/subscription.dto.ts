@@ -23,6 +23,9 @@ export class ChannelSubscriptionResponseDto {
   id: string;
 
   @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  userId: string;
+
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
   channelId: string;
 
   @ApiProperty({ example: true })
@@ -39,6 +42,9 @@ export class ChannelSubscriptionResponseDto {
 }
 
 export class CheckSubscriptionResponseDto {
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  userId: string;
+
   @ApiProperty({ example: '507f1f77bcf86cd799439011' })
   channelId: string;
 

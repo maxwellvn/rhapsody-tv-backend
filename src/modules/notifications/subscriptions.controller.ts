@@ -53,6 +53,7 @@ export class SubscriptionsController {
       success: true,
       message: 'Subscription status retrieved successfully',
       data: {
+        userId,
         channelId,
         isSubscribed,
         subscription: subscription ? this.toResponse(subscription) : null,
@@ -190,6 +191,7 @@ export class SubscriptionsController {
   ): ChannelSubscriptionResponseDto {
     return {
       id: doc._id.toString(),
+      userId: doc.userId.toString(),
       channelId: doc.channelId.toString(),
       isSubscribed: doc.isSubscribed,
       notifyOnNewVideo: doc.notifyOnNewVideo,
