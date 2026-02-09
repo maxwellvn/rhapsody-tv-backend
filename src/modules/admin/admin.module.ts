@@ -33,12 +33,16 @@ import {
 import { AdminChannelsController } from './controllers/admin-channels.controller';
 import { AdminDashboardController } from './controllers/admin-dashboard.controller';
 import { AdminLivestreamsController } from './controllers/admin-livestreams.controller';
+import { AdminModerationController } from './controllers/admin-moderation.controller';
+import { AdminUsersController } from './controllers/admin-users.controller';
 import { AdminVideosController } from './controllers/admin-videos.controller';
 import { AdminProgramsController } from './controllers/admin-programs.controller';
 import { AdminUploadController } from './controllers/admin-upload.controller';
 import { AdminChannelsService } from './services/admin-channels.service';
 import { AdminDashboardService } from './services/admin-dashboard.service';
 import { AdminLivestreamsService } from './services/admin-livestreams.service';
+import { AdminModerationService } from './services/admin-moderation.service';
+import { AdminUsersService } from './services/admin-users.service';
 import { AdminVideosService } from './services/admin-videos.service';
 import { AdminProgramsService } from './services/admin-programs.service';
 import { NotificationsModule } from '../notifications';
@@ -65,6 +69,8 @@ import { NotificationsModule } from '../notifications';
     AdminChannelsController,
     AdminDashboardController,
     AdminLivestreamsController,
+    AdminUsersController,
+    AdminModerationController,
     AdminVideosController,
     AdminProgramsController,
     AdminUploadController,
@@ -73,6 +79,8 @@ import { NotificationsModule } from '../notifications';
     AdminChannelsService,
     AdminDashboardService,
     AdminLivestreamsService,
+    AdminUsersService,
+    AdminModerationService,
     AdminVideosService,
     AdminProgramsService,
   ],
