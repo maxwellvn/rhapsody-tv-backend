@@ -117,7 +117,9 @@ async function bootstrap() {
       'Channel endpoints',
       [ChannelModule],
     );
-    setupModuleDocs('vod', 'Rhapsody TV API - VOD', 'VOD endpoints', [VodModule]);
+    setupModuleDocs('vod', 'Rhapsody TV API - VOD', 'VOD endpoints', [
+      VodModule,
+    ]);
     setupModuleDocs(
       'notifications',
       'Rhapsody TV API - Notifications',
@@ -130,12 +132,9 @@ async function bootstrap() {
       'Homepage endpoints',
       [HomepageModule],
     );
-    setupModuleDocs(
-      'stream',
-      'Rhapsody TV API - Stream',
-      'Stream endpoints',
-      [StreamModule],
-    );
+    setupModuleDocs('stream', 'Rhapsody TV API - Stream', 'Stream endpoints', [
+      StreamModule,
+    ]);
     setupModuleDocs('mail', 'Rhapsody TV API - Mail', 'Mail endpoints', [
       MailModule,
     ]);
