@@ -47,7 +47,7 @@ export class VodService {
         .sort({ publishedAt: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('channelId', 'name logoUrl')
+        .populate('channelId', 'name slug logoUrl')
         .exec(),
       this.videoModel.countDocuments({ isActive: true, visibility: 'public' }),
     ]);
@@ -75,7 +75,7 @@ export class VodService {
         { $inc: { viewCount: 1 } },
         { new: true },
       )
-      .populate('channelId', 'name logoUrl')
+      .populate('channelId', 'name slug logoUrl')
       .exec();
 
     if (!video) {
@@ -406,6 +406,7 @@ export class VodService {
     return {
       id: video._id.toString(),
       channelId: channelData?._id?.toString() || video.channelId.toString(),
+      channelSlug: channelData?.slug,
       title: video.title,
       description: video.description,
       playbackUrl: video.playbackUrl,
@@ -422,6 +423,7 @@ export class VodService {
         ? {
             id: channelData._id?.toString(),
             name: channelData.name,
+            slug: channelData.slug,
             logoUrl: channelData.logoUrl,
           }
         : undefined,

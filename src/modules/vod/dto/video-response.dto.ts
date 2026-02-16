@@ -7,6 +7,9 @@ export class VodVideoResponseDto {
   @ApiProperty({ description: 'Channel ID' })
   channelId: string;
 
+  @ApiPropertyOptional({ description: 'Channel slug' })
+  channelSlug?: string;
+
   @ApiProperty({ description: 'Video title' })
   title: string;
 
@@ -41,6 +44,7 @@ export class VodVideoResponseDto {
   channel?: {
     id: string;
     name: string;
+    slug?: string;
     logoUrl?: string;
   };
 }
