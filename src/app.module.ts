@@ -10,6 +10,7 @@ import {
   redisConfig,
   jwtConfig,
   imagekitConfig,
+  kingschatConfig,
 } from './config';
 
 // Common
@@ -35,7 +36,14 @@ import { MailModule } from './modules/mail/mail.module';
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, redisConfig, jwtConfig, imagekitConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        redisConfig,
+        jwtConfig,
+        imagekitConfig,
+        kingschatConfig,
+      ],
       envFilePath: ['.env', '.env.local'],
     }),
 

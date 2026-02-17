@@ -6,6 +6,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { User, UserDocument, type UserSettings } from './schemas/user.schema';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -44,6 +45,46 @@ function deepMerge<T extends object>(base: T, patch: DeepPartial<T>): T {
 @Injectable()
 export class UserService {
   constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+
+  async findOrCreateFromKingsChat(input: {
+    kingsChatUserId: string;
+    email: string;
+    fullName: string;
+    kingsChatUsername?: string;
+  }): Promise<UserDocument> {
+    const normalizedEmail = input.email.toLowerCase();
+
+    let user = await this.userModel.findOne({
+      kingsChatUserId: input.kingsChatUserId,
+    });
+
+    if (!user) {
+      user = await this.userModel.findOne({ email: normalizedEmail });
+    }
+
+    if (user) {
+      user.fullName = input.fullName;
+      user.email = normalizedEmail;
+      user.kingsChatUserId = input.kingsChatUserId;
+      user.kingsChatUsername = input.kingsChatUsername;
+      user.isEmailVerified = true;
+      return user.save();
+    }
+
+    const generatedPassword = randomBytes(32).toString('hex');
+    const hashedPassword = await bcrypt.hash(generatedPassword, 12);
+
+    const createdUser = new this.userModel({
+      fullName: input.fullName,
+      email: normalizedEmail,
+      password: hashedPassword,
+      kingsChatUserId: input.kingsChatUserId,
+      kingsChatUsername: input.kingsChatUsername,
+      isEmailVerified: true,
+    });
+
+    return createdUser.save();
+  }
 
   async create(createUserDto: CreateUserDto): Promise<UserDocument> {
     const existingUser = await this.userModel.findOne({

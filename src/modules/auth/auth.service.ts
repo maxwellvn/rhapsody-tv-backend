@@ -7,10 +7,12 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { ConfigType } from '@nestjs/config';
+import axios from 'axios';
 import * as bcrypt from 'bcrypt';
 import { UserService } from '../user/user.service';
 import { RegisterDto } from './dto/register.dto';
 import jwtConfig from '../../config/jwt.config';
+import kingschatConfig from '../../config/kingschat.config';
 import { UserDocument } from '../user/schemas/user.schema';
 import { RedisService } from '../../shared/services/redis';
 
@@ -25,6 +27,8 @@ export class AuthService {
     private readonly mailService: MailService,
     @Inject(jwtConfig.KEY)
     private readonly config: ConfigType<typeof jwtConfig>,
+    @Inject(kingschatConfig.KEY)
+    private readonly kingsChat: ConfigType<typeof kingschatConfig>,
   ) {}
 
   private readonly emailVerificationTtlSeconds = 10 * 60;
@@ -160,7 +164,10 @@ export class AuthService {
       await this.requestEmailVerification(user.email);
     } catch (error) {
       // Log but don't fail registration - user can request verification again
-      console.error('Failed to send verification email during registration:', error);
+      console.error(
+        'Failed to send verification email during registration:',
+        error,
+      );
     }
 
     return {
@@ -173,6 +180,58 @@ export class AuthService {
       },
       ...tokens,
     };
+  }
+
+  async loginWithKingsChat(accessToken: string) {
+    const profile = await this.fetchKingsChatProfile(accessToken);
+
+    const userId =
+      this.pickString(profile, ['user_id']) ??
+      this.pickString(profile, ['profile', 'user_id']) ??
+      this.pickString(profile, ['user', 'user_id']) ??
+      this.pickString(profile, ['id']) ??
+      this.pickString(profile, ['profile', 'id']) ??
+      this.pickString(profile, ['user', 'id']);
+
+    if (!userId) {
+      throw new UnauthorizedException(
+        'KingsChat profile does not include a user identifier',
+      );
+    }
+
+    const providerEmail =
+      this.pickString(profile, ['email']) ??
+      this.pickString(profile, ['profile', 'email']) ??
+      this.pickString(profile, ['user', 'email']);
+
+    const safeUserId = userId.toLowerCase().replace(/[^a-z0-9._-]/g, '_');
+    const email = providerEmail || `kingschat_${safeUserId}@kingschat.local`;
+
+    const fullName =
+      this.pickString(profile, ['full_name']) ??
+      this.pickString(profile, ['fullName']) ??
+      this.pickString(profile, ['name']) ??
+      this.pickString(profile, ['display_name']) ??
+      this.pickString(profile, ['profile', 'full_name']) ??
+      this.pickString(profile, ['profile', 'name']) ??
+      this.pickString(profile, ['user', 'full_name']) ??
+      this.pickString(profile, ['user', 'name']) ??
+      'KingsChat User';
+
+    const kingsChatUsername =
+      this.pickString(profile, ['username']) ??
+      this.pickString(profile, ['profile', 'username']) ??
+      this.pickString(profile, ['user', 'username']) ??
+      this.pickString(profile, ['handle']);
+
+    const user = await this.findOrCreateKingsChatUser({
+      kingsChatUserId: userId,
+      email,
+      fullName,
+      kingsChatUsername,
+    });
+
+    return this.login(user);
   }
 
   async refreshTokens(userId: string, refreshToken: string) {
@@ -222,6 +281,74 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  private async findOrCreateKingsChatUser(input: {
+    kingsChatUserId: string;
+    email: string;
+    fullName: string;
+    kingsChatUsername?: string;
+  }): Promise<UserDocument> {
+    const kingsChatUserService = this.userService as unknown as {
+      findOrCreateFromKingsChat: (payload: {
+        kingsChatUserId: string;
+        email: string;
+        fullName: string;
+        kingsChatUsername?: string;
+      }) => Promise<UserDocument>;
+    };
+
+    return kingsChatUserService.findOrCreateFromKingsChat(input);
+  }
+
+  private async fetchKingsChatProfile(
+    accessToken: string,
+  ): Promise<Record<string, unknown>> {
+    try {
+      const response = await axios.get(this.kingsChat.profileUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/json',
+          'X-Client-Id': this.kingsChat.clientId,
+          'X-Client-Version': this.kingsChat.clientVersion,
+          'X-Device-Id': this.kingsChat.deviceId,
+          'X-Platform': this.kingsChat.platform,
+        },
+        timeout: this.kingsChat.requestTimeoutMs,
+      });
+
+      if (!response.data || typeof response.data !== 'object') {
+        throw new UnauthorizedException('Invalid response from KingsChat');
+      }
+
+      return response.data as Record<string, unknown>;
+    } catch {
+      throw new UnauthorizedException('Invalid KingsChat access token');
+    }
+  }
+
+  private pickString(
+    source: Record<string, unknown>,
+    path: string[],
+  ): string | undefined {
+    const value = this.pickValue(source, path);
+    return typeof value === 'string' && value.trim().length > 0
+      ? value.trim()
+      : undefined;
+  }
+
+  private pickValue(source: unknown, path: string[]): unknown {
+    let current: unknown = source;
+
+    for (const segment of path) {
+      if (!current || typeof current !== 'object') {
+        return undefined;
+      }
+
+      current = (current as Record<string, unknown>)[segment];
+    }
+
+    return current;
   }
 
   private parseExpiresIn(value: string): number {

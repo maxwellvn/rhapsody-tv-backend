@@ -8,12 +8,14 @@ import { UserModule } from '../user/user.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import jwtConfig from '../../config/jwt.config';
+import kingschatConfig from '../../config/kingschat.config';
 
 @Module({
   imports: [
     UserModule,
     PassportModule,
     ConfigModule.forFeature(jwtConfig),
+    ConfigModule.forFeature(kingschatConfig),
     JwtModule.register({}),
   ],
   controllers: [AuthController],

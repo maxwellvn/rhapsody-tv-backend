@@ -54,6 +54,12 @@ export class User {
   @Prop({ required: true, lowercase: true, trim: true })
   email: string;
 
+  @Prop({ trim: true })
+  kingsChatUserId?: string;
+
+  @Prop({ trim: true })
+  kingsChatUsername?: string;
+
   @Prop({ required: true, select: false })
   password: string;
 
@@ -132,6 +138,7 @@ export const UserSchema = SchemaFactory.createForClass(User);
 
 // Indexes
 UserSchema.index({ email: 1 });
+UserSchema.index({ kingsChatUserId: 1 }, { sparse: true });
 UserSchema.index({ roles: 1 });
 UserSchema.index({ createdAt: -1 });
 
