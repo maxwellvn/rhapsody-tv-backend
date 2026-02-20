@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import ImageKit from 'imagekit';
 import { ConfigService } from '@nestjs/config';
 
@@ -15,21 +19,44 @@ export interface ImageKitUploadResponse {
 
 @Injectable()
 export class ImageKitService {
-  private readonly imagekit: ImageKit;
+  private readonly logger = new Logger(ImageKitService.name);
+  private readonly imagekit: ImageKit | null = null;
 
   constructor(private readonly configService: ConfigService) {
-    this.imagekit = new ImageKit({
-      publicKey: this.configService.get<string>('imagekit.publicKey') || '',
-      privateKey: this.configService.get<string>('imagekit.privateKey') || '',
-      urlEndpoint: this.configService.get<string>('imagekit.urlEndpoint') || '',
-    });
+    const publicKey = this.configService.get<string>('imagekit.publicKey') || '';
+    const privateKey =
+      this.configService.get<string>('imagekit.privateKey') || '';
+    const urlEndpoint =
+      this.configService.get<string>('imagekit.urlEndpoint') || '';
+
+    if (publicKey && privateKey && urlEndpoint) {
+      this.imagekit = new ImageKit({
+        publicKey,
+        privateKey,
+        urlEndpoint,
+      });
+      return;
+    }
+
+    this.logger.warn(
+      'ImageKit is not configured. Upload endpoints will be unavailable until IMAGEKIT_* env vars are set.',
+    );
+  }
+
+  private getClient(): ImageKit {
+    if (!this.imagekit) {
+      throw new ServiceUnavailableException(
+        'ImageKit is not configured on this environment',
+      );
+    }
+    return this.imagekit;
   }
 
   async uploadFile(
     file: Express.Multer.File,
     folder?: string,
   ): Promise<ImageKitUploadResponse> {
-    const uploadResult = await this.imagekit.upload({
+    const uploadResult = await this.getClient().upload({
       file: file.buffer,
       fileName: file.originalname,
       folder: folder || 'rhapsody-tv',
@@ -63,7 +90,7 @@ export class ImageKitService {
     fileName: string,
     folder?: string,
   ): Promise<ImageKitUploadResponse> {
-    const uploadResult = await this.imagekit.upload({
+    const uploadResult = await this.getClient().upload({
       file: url,
       fileName: fileName,
       folder: folder || 'rhapsody-tv',
@@ -93,11 +120,11 @@ export class ImageKitService {
   }
 
   async deleteFile(fileId: string): Promise<void> {
-    await this.imagekit.deleteFile(fileId);
+    await this.getClient().deleteFile(fileId);
   }
 
   getAuthenticationParameters() {
-    return this.imagekit.getAuthenticationParameters();
+    return this.getClient().getAuthenticationParameters();
   }
 
   getUrlEndpoint(): string {

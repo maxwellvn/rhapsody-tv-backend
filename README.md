@@ -60,6 +60,46 @@ Detailed frontend integration flow is documented in `KINGSCHAT_FRONTEND_INTEGRAT
 $ npm install
 ```
 
+## Coolify Deployment
+
+This backend is now Docker-ready for Coolify.
+
+### 1. Create a Coolify application from Git
+
+- Repository: this backend repo
+- Branch: `main`
+- Build Pack: `Dockerfile`
+- Dockerfile path: `Dockerfile`
+- Port: `3000`
+
+### 2. Configure required environment variables in Coolify
+
+Use `.env.example` as the source of truth. Minimum required for production:
+
+- `NODE_ENV=production`
+- `PORT=3000`
+- `MONGODB_URI=...`
+- `REDIS_URL=...`
+- `JWT_SECRET=...`
+- `JWT_REFRESH_SECRET=...`
+- `CORS_ORIGIN=https://your-frontend-domain.com`
+
+If your flows use them, also set:
+
+- `ZEPTOMAIL_API_KEY`
+- `ZEPTOMAIL_FROM_ADDRESS`
+- `IMAGEKIT_PUBLIC_KEY`
+- `IMAGEKIT_PRIVATE_KEY`
+- `IMAGEKIT_URL_ENDPOINT`
+- `KINGSCHAT_*` variables
+
+### 3. Deploy
+
+Click deploy in Coolify. The container runs with:
+
+- production build (`pnpm run build`)
+- production start command (`pnpm run start:prod`)
+
 ## Compile and run the project
 
 ```bash

@@ -11,6 +11,7 @@ WORKDIR /app
 
 # Set production environment
 ENV NODE_ENV="production"
+ENV PORT=3000
 
 # Install pnpm
 ARG PNPM_VERSION=latest
@@ -33,14 +34,17 @@ COPY . .
 
 # Build application
 RUN pnpm run build
+RUN pnpm prune --prod
 
 
 # Final stage for app image
 FROM base
 
-# Copy built application
-COPY --from=build /app /app
+# Copy only runtime artifacts
+COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/
+COPY --from=build /app/node_modules /app/node_modules
+COPY --from=build /app/dist /app/dist
 
-# Start the server by default, this can be overwritten at runtime
 EXPOSE 3000
-CMD [ "pnpm", "run", "start" ]
+
+CMD ["pnpm", "run", "start:prod"]
