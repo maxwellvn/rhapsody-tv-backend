@@ -32,8 +32,9 @@ import { Role } from '../../../shared/enums/role.enum';
 
 interface AuthenticatedSocket extends Socket {
   data: {
-    user: WsJwtPayload;
+    user?: WsJwtPayload;
     currentLivestreamId?: string;
+    currentViewerKey?: string;
   };
 }
 
@@ -87,28 +88,22 @@ export class LivestreamGateway
    * Authenticate the user via JWT from handshake
    */
   async handleConnection(client: AuthenticatedSocket): Promise<void> {
+    const token = this.extractToken(client);
+
+    if (!token) {
+      this.logger.log(`Client ${client.id} connected as guest viewer`);
+      return;
+    }
+
     try {
-      const token = this.extractToken(client);
-
-      if (!token) {
-        this.logger.warn(
-          `Client ${client.id} connection rejected: No token provided`,
-        );
-        client.emit(WS_EVENTS.ERROR, { message: 'Authentication required' });
-        client.disconnect();
-        return;
-      }
-
       const payload = await this.jwtService.verifyAsync<WsJwtPayload>(token);
       client.data.user = payload;
-
       this.logger.log(`Client ${client.id} connected as user ${payload.sub}`);
-    } catch (error) {
+    } catch {
+      // Allow socket connection as guest viewer even when auth token is invalid.
       this.logger.warn(
-        `Client ${client.id} connection rejected: Invalid token`,
+        `Client ${client.id} provided invalid token; continuing as guest viewer`,
       );
-      client.emit(WS_EVENTS.ERROR, { message: 'Invalid authentication token' });
-      client.disconnect();
     }
   }
 
@@ -117,17 +112,18 @@ export class LivestreamGateway
    * Clean up viewer tracking
    */
   async handleDisconnect(client: AuthenticatedSocket): Promise<void> {
-    const userId = client.data?.user?.sub;
+    const userId = client.data.user?.sub;
     const livestreamId = client.data?.currentLivestreamId;
+    const viewerKey = client.data.currentViewerKey || this.getViewerIdentity(client);
 
-    if (userId && livestreamId) {
+    if (livestreamId) {
       const viewerCount = await this.viewerService.removeViewer(
         livestreamId,
-        userId,
+        viewerKey,
       );
       this.broadcastViewerCount(livestreamId, viewerCount);
       this.logger.log(
-        `User ${userId} disconnected from livestream ${livestreamId}`,
+        `Viewer ${viewerKey} disconnected from livestream ${livestreamId}`,
       );
     }
 
@@ -137,14 +133,14 @@ export class LivestreamGateway
   /**
    * Join a livestream room
    */
-  @UseGuards(WsJwtAuthGuard)
   @UsePipes(new ValidationPipe({ transform: true }))
   @SubscribeMessage(WS_EVENTS.JOIN_LIVESTREAM)
   async handleJoinLivestream(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: JoinLivestreamDto,
   ): Promise<void> {
-    const userId = client.data.user.sub;
+    const userId = client.data.user?.sub;
+    const viewerKey = this.getViewerIdentity(client);
     const { livestreamId } = data;
 
     // Validate livestream exists
@@ -169,11 +165,12 @@ export class LivestreamGateway
     const roomName = this.getRoomName(livestreamId);
     await client.join(roomName);
     client.data.currentLivestreamId = livestreamId;
+    client.data.currentViewerKey = viewerKey;
 
     // Add to viewer tracking
     const viewerCount = await this.viewerService.addViewer(
       livestreamId,
-      userId,
+      viewerKey,
     );
 
     // Broadcast updated viewer count to all in room
@@ -191,10 +188,10 @@ export class LivestreamGateway
     }
 
     // Send the current user's like status and current total count
-    const [hasLiked, likeCount] = await Promise.all([
-      this.likeService.hasUserLiked(livestreamId, userId),
-      this.likeService.getLikeCount(livestreamId),
-    ]);
+    const likeCount = await this.likeService.getLikeCount(livestreamId);
+    const hasLiked = userId
+      ? await this.likeService.hasUserLiked(livestreamId, userId)
+      : false;
 
     client.emit(WS_EVENTS.USER_LIKE_STATUS, { livestreamId, hasLiked });
 
@@ -204,20 +201,19 @@ export class LivestreamGateway
       count: likeCount,
     });
 
-    this.logger.log(`User ${userId} joined livestream ${livestreamId}`);
+    this.logger.log(`Viewer ${viewerKey} joined livestream ${livestreamId}`);
   }
 
   /**
    * Leave a livestream room
    */
-  @UseGuards(WsJwtAuthGuard)
   @UsePipes(new ValidationPipe({ transform: true }))
   @SubscribeMessage(WS_EVENTS.LEAVE_LIVESTREAM)
   async handleLeaveLivestream(
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: JoinLivestreamDto,
   ): Promise<void> {
-    const userId = client.data.user.sub;
+    const viewerKey = client.data.currentViewerKey || this.getViewerIdentity(client);
     const { livestreamId } = data;
 
     const roomName = this.getRoomName(livestreamId);
@@ -230,11 +226,11 @@ export class LivestreamGateway
     // Remove from viewer tracking
     const viewerCount = await this.viewerService.removeViewer(
       livestreamId,
-      userId,
+      viewerKey,
     );
     this.broadcastViewerCount(livestreamId, viewerCount);
 
-    this.logger.log(`User ${userId} left livestream ${livestreamId}`);
+    this.logger.log(`Viewer ${viewerKey} left livestream ${livestreamId}`);
   }
 
   /**
@@ -247,7 +243,8 @@ export class LivestreamGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: SendCommentDto,
   ): Promise<void> {
-    const userId = client.data.user.sub;
+    const user = this.requireAuthenticatedUser(client);
+    const userId = user.sub;
     const { livestreamId, content, parentCommentId } = data;
 
     // Validate livestream
@@ -294,7 +291,8 @@ export class LivestreamGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: ToggleLikeDto,
   ): Promise<void> {
-    const userId = client.data.user.sub;
+    const user = this.requireAuthenticatedUser(client);
+    const userId = user.sub;
     const { livestreamId } = data;
 
     // We don't necessarily need to check chatEnabled for likes, unless desired.
@@ -334,8 +332,9 @@ export class LivestreamGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: DeleteCommentDto,
   ): Promise<void> {
+    const user = this.requireAuthenticatedUser(client);
     const { commentId } = data;
-    const userRoles = client.data.user.roles;
+    const userRoles = user.roles;
 
     // Only admins can delete comments
     if (!userRoles.includes(Role.ADMIN)) {
@@ -356,7 +355,7 @@ export class LivestreamGateway
     this.broadcastCommentDeleted(livestreamId, commentId);
 
     this.logger.log(
-      `Comment ${commentId} deleted by admin ${client.data.user.sub}`,
+      `Comment ${commentId} deleted by admin ${user.sub}`,
     );
   }
 
@@ -370,9 +369,10 @@ export class LivestreamGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: BanUserDto,
   ): Promise<void> {
+    const user = this.requireAuthenticatedUser(client);
     const { livestreamId, userId: targetUserId } = data;
-    const userRoles = client.data.user.roles;
-    const adminUserId = client.data.user.sub;
+    const userRoles = user.roles;
+    const adminUserId = user.sub;
 
     // Only admins can ban users
     if (!userRoles.includes(Role.ADMIN)) {
@@ -403,8 +403,9 @@ export class LivestreamGateway
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: BanUserDto,
   ): Promise<void> {
+    const user = this.requireAuthenticatedUser(client);
     const { livestreamId, userId: targetUserId } = data;
-    const userRoles = client.data.user.roles;
+    const userRoles = user.roles;
 
     // Only admins can unban users
     if (!userRoles.includes(Role.ADMIN)) {
@@ -415,7 +416,7 @@ export class LivestreamGateway
     await this.chatService.unbanUser(livestreamId, targetUserId);
 
     this.logger.log(
-      `User ${targetUserId} unbanned from livestream ${livestreamId} by admin ${client.data.user.sub}`,
+      `User ${targetUserId} unbanned from livestream ${livestreamId} by admin ${user.sub}`,
     );
   }
 
@@ -451,6 +452,18 @@ export class LivestreamGateway
     }
 
     return null;
+  }
+
+  private getViewerIdentity(client: AuthenticatedSocket): string {
+    return client.data.user?.sub || `guest:${client.id}`;
+  }
+
+  private requireAuthenticatedUser(client: AuthenticatedSocket): WsJwtPayload {
+    const user = client.data.user;
+    if (!user) {
+      throw new WsException('Unauthorized: Authentication required');
+    }
+    return user;
   }
 
   /**

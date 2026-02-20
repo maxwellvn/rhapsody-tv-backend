@@ -41,13 +41,14 @@ export class NotificationsController {
 
     const filter = { userId: new Types.ObjectId(userId) };
 
-    const [notifications, total] = await Promise.all([
+    const [notifications, total, unreadCount] = await Promise.all([
       this.notificationModel
         .find(filter)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(safeLimit),
       this.notificationModel.countDocuments(filter),
+      this.notificationModel.countDocuments({ ...filter, isRead: false }),
     ]);
 
     return {
@@ -72,6 +73,7 @@ export class NotificationsController {
         page: safePage,
         limit: safeLimit,
         totalPages: Math.ceil(total / safeLimit),
+        unreadCount,
       },
     };
   }

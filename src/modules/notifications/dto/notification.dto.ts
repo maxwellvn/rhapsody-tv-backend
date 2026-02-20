@@ -39,4 +39,7 @@ export class PaginatedNotificationsDto {
 
   @ApiProperty({ example: 5 })
   totalPages: number;
+
+  @ApiProperty({ example: 3 })
+  unreadCount: number;
 }

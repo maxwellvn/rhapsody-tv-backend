@@ -254,7 +254,7 @@ export class HomepageService {
     const channels = await this.channelModel
       .find({ isActive: true })
       .limit(safeLimit)
-      .sort({ createdAt: -1 });
+      .sort({ defaultLiveStreamId: -1, createdAt: -1 });
     return channels.map((c) => this.toChannelDto(c));
   }
 

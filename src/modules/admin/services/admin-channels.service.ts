@@ -6,12 +6,16 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Channel, ChannelDocument } from '../../channel/schemas/channel.schema';
+import { User, UserDocument } from '../../user/schemas/user.schema';
+import { NotificationsService } from '../../notifications';
 import { CreateChannelDto, UpdateChannelDto } from '../dto/channels';
 
 @Injectable()
 export class AdminChannelsService {
   constructor(
     @InjectModel(Channel.name) private channelModel: Model<ChannelDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(dto: CreateChannelDto): Promise<ChannelDocument> {
@@ -28,7 +32,30 @@ export class AdminChannelsService {
       slug: dto.slug.toLowerCase(),
     });
 
-    return channel.save();
+    const savedChannel = await channel.save();
+
+    const users = await this.userModel
+      .find({ isActive: true })
+      .select('_id')
+      .lean();
+    const userIds = users.map((user) => user._id.toString());
+
+    if (userIds.length > 0) {
+      await this.notificationsService.notifyAnnouncement({
+        title: 'New channel added',
+        body: `${savedChannel.name} is now available on Rhapsody TV`,
+        userIds,
+        data: {
+          event: 'channel_added',
+          channelId: savedChannel._id.toString(),
+          channelSlug: savedChannel.slug,
+          avatarUrl: savedChannel.logoUrl,
+          thumbnailUrl: savedChannel.coverImageUrl || savedChannel.logoUrl,
+        },
+      });
+    }
+
+    return savedChannel;
   }
 
   async findAll(
