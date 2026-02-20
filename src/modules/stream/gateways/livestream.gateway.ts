@@ -147,22 +147,12 @@ export class LivestreamGateway
     const userId = client.data.user.sub;
     const { livestreamId } = data;
 
-    // Validate livestream exists and chat is enabled
+    // Validate livestream exists
     const livestreamInfo =
       await this.chatService.isLivestreamValid(livestreamId);
 
     if (!livestreamInfo.exists) {
       throw new WsException('Livestream not found');
-    }
-
-    if (!livestreamInfo.chatEnabled) {
-      throw new WsException('Chat is disabled for this livestream');
-    }
-
-    // Check if user is banned
-    const isBanned = await this.chatService.isUserBanned(livestreamId, userId);
-    if (isBanned) {
-      throw new WsException('You are banned from this livestream chat');
     }
 
     // Leave previous livestream if any
@@ -189,12 +179,16 @@ export class LivestreamGateway
     // Broadcast updated viewer count to all in room
     this.broadcastViewerCount(livestreamId, viewerCount);
 
-    // Send recent comment history to the joining user
-    const recentComments = await this.chatService.getRecentComments(
-      livestreamId,
-      50,
-    );
-    client.emit(WS_EVENTS.COMMENT_HISTORY, { comments: recentComments });
+    // Send recent comment history only when chat is enabled.
+    if (livestreamInfo.chatEnabled) {
+      const recentComments = await this.chatService.getRecentComments(
+        livestreamId,
+        50,
+      );
+      client.emit(WS_EVENTS.COMMENT_HISTORY, { comments: recentComments });
+    } else {
+      client.emit(WS_EVENTS.COMMENT_HISTORY, { comments: [] });
+    }
 
     // Send the current user's like status and current total count
     const [hasLiked, likeCount] = await Promise.all([
