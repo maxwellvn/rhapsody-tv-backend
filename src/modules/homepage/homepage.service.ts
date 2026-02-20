@@ -189,6 +189,8 @@ export class HomepageService {
       playbackUrl: video.playbackUrl,
       thumbnailUrl: video.thumbnailUrl,
       durationSeconds: video.durationSeconds,
+      isFeatured: video.isFeatured,
+      featuredOrder: video.featuredOrder,
       channel: populatedChannel
         ? this.toChannelDto(populatedChannel)
         : undefined,
@@ -333,11 +335,12 @@ export class HomepageService {
     const videos = await this.videoModel
       .find({
         isActive: true,
+        isFeatured: true,
         visibility: VideoVisibility.PUBLIC,
       })
       .limit(safeLimit)
       .populate('channelId', 'name slug logoUrl coverImageUrl')
-      .sort({ publishedAt: -1, createdAt: -1 });
+      .sort({ featuredOrder: 1, publishedAt: -1, createdAt: -1 });
     return videos.map((v) => this.toVideoDto(v));
   }
 

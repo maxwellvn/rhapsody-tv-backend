@@ -44,6 +44,12 @@ export class Video {
   @Prop({ default: true })
   isActive: boolean;
 
+  @Prop({ default: false, index: true })
+  isFeatured: boolean;
+
+  @Prop({ type: Number, min: 1, max: 1000, index: true })
+  featuredOrder?: number;
+
   @Prop({ default: 0 })
   likeCount: number;
 
@@ -61,6 +67,7 @@ VideoSchema.index({ channelId: 1, createdAt: -1 });
 VideoSchema.index({ programId: 1, createdAt: -1 });
 VideoSchema.index({ visibility: 1, publishedAt: -1 });
 VideoSchema.index({ isActive: 1 });
+VideoSchema.index({ isFeatured: 1, featuredOrder: 1, publishedAt: -1, createdAt: -1 });
 
 // Ensure __v is removed
 VideoSchema.set('toJSON', {

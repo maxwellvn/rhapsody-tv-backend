@@ -138,6 +138,12 @@ export class VideoResponseDto {
   @ApiProperty({ example: true })
   isActive: boolean;
 
+  @ApiProperty({ example: false })
+  isFeatured: boolean;
+
+  @ApiPropertyOptional({ example: 1 })
+  featuredOrder?: number;
+
   @ApiPropertyOptional({ example: '2026-01-15T20:00:00.000Z' })
   publishedAt?: string;
 

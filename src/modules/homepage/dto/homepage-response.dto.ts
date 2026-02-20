@@ -109,6 +109,12 @@ export class HomepageVideoDto {
   @ApiPropertyOptional({ example: 3600 })
   durationSeconds?: number;
 
+  @ApiPropertyOptional({ example: false })
+  isFeatured?: boolean;
+
+  @ApiPropertyOptional({ example: 1 })
+  featuredOrder?: number;
+
   @ApiPropertyOptional({ type: HomepageChannelDto })
   channel?: HomepageChannelDto;
 }

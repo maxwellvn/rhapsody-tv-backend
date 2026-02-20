@@ -11,15 +11,33 @@ import { NotificationsService } from '../../notifications';
 
 @Injectable()
 export class AdminVideosService {
+  private normalizeFeaturedInput<T extends { isFeatured?: boolean; featuredOrder?: number }>(
+    dto: T,
+  ): T {
+    const normalized = { ...dto } as T;
+
+    if (normalized.isFeatured !== true) {
+      (normalized as T & { featuredOrder?: undefined }).featuredOrder = undefined;
+    } else if (
+      normalized.featuredOrder === undefined ||
+      normalized.featuredOrder === null
+    ) {
+      (normalized as T & { featuredOrder?: number }).featuredOrder = 999;
+    }
+
+    return normalized;
+  }
+
   constructor(
     @InjectModel(Video.name) private videoModel: Model<VideoDocument>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(dto: CreateVideoDto): Promise<VideoDocument> {
+    const payload = this.normalizeFeaturedInput(dto);
     const video = new this.videoModel({
-      ...dto,
-      channelId: dto.channelId,
+      ...payload,
+      channelId: payload.channelId,
     });
 
     const saved = await video.save();
@@ -71,7 +89,14 @@ export class AdminVideosService {
   }
 
   async update(id: string, dto: UpdateVideoDto): Promise<VideoDocument> {
-    const video = await this.videoModel.findByIdAndUpdate(id, dto, {
+    const payload = this.normalizeFeaturedInput(dto);
+    const updateOperation: Record<string, unknown> = { $set: payload };
+
+    if (payload.isFeatured === false) {
+      updateOperation.$unset = { featuredOrder: 1 };
+    }
+
+    const video = await this.videoModel.findByIdAndUpdate(id, updateOperation, {
       new: true,
       runValidators: true,
     });

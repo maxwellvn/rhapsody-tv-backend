@@ -8,6 +8,9 @@ import {
   MinLength,
   MaxLength,
   IsUrl,
+  IsInt,
+  Min,
+  Max,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { VideoVisibility } from '../../../../modules/stream/schemas/video.schema';
@@ -71,4 +74,23 @@ export class CreateVideoDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    default: false,
+    description: 'Whether this video is featured on homepage featured videos',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isFeatured?: boolean;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description:
+      'Featured display order (lower number appears first). Only used when isFeatured=true.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  featuredOrder?: number;
 }
