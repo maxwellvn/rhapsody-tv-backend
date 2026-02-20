@@ -251,11 +251,61 @@ export class HomepageService {
 
   async getChannels(limit = 10): Promise<HomepageChannelDto[]> {
     const safeLimit = Math.min(Math.max(limit, 1), 50);
-    const channels = await this.channelModel
-      .find({ isActive: true })
-      .limit(safeLimit)
-      .sort({ defaultLiveStreamId: -1, createdAt: -1 });
-    return channels.map((c) => this.toChannelDto(c));
+    const channels = await this.channelModel.find({ isActive: true }).sort({
+      createdAt: -1,
+    });
+
+    const defaultLiveStreamIds = channels
+      .map((channel) => channel.defaultLiveStreamId?.toString())
+      .filter((id): id is string => !!id);
+
+    const liveDefaultIds = new Set<string>();
+
+    if (defaultLiveStreamIds.length > 0) {
+      const liveDefaults = await this.liveStreamModel
+        .find({
+          _id: { $in: defaultLiveStreamIds },
+          status: LiveStreamStatus.LIVE,
+        })
+        .select('_id')
+        .lean();
+
+      liveDefaults.forEach((stream) => {
+        liveDefaultIds.add(stream._id.toString());
+      });
+    }
+
+    const sorted = [...channels].sort((a, b) => {
+      const aDefaultId = a.defaultLiveStreamId?.toString();
+      const bDefaultId = b.defaultLiveStreamId?.toString();
+
+      const aHasLiveDefault = aDefaultId ? liveDefaultIds.has(aDefaultId) : false;
+      const bHasLiveDefault = bDefaultId ? liveDefaultIds.has(bDefaultId) : false;
+
+      if (aHasLiveDefault !== bHasLiveDefault) {
+        return aHasLiveDefault ? -1 : 1;
+      }
+
+      const aHasDefault = !!aDefaultId;
+      const bHasDefault = !!bDefaultId;
+
+      if (aHasDefault !== bHasDefault) {
+        return aHasDefault ? -1 : 1;
+      }
+
+      const aCreatedAt = (
+        a as unknown as { createdAt?: Date | string | number }
+      ).createdAt;
+      const bCreatedAt = (
+        b as unknown as { createdAt?: Date | string | number }
+      ).createdAt;
+
+      return (
+        new Date(bCreatedAt ?? 0).getTime() - new Date(aCreatedAt ?? 0).getTime()
+      );
+    });
+
+    return sorted.slice(0, safeLimit).map((c) => this.toChannelDto(c));
   }
 
   async getPrograms(limit = 10): Promise<HomepageProgramDto[]> {
