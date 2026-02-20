@@ -23,6 +23,8 @@ import type {
 
 @Injectable()
 export class HomepageService {
+  private readonly PRIMARY_HOME_CHANNEL_SLUG = 'rhapsody-tv';
+
   constructor(
     @InjectModel(Channel.name)
     private readonly channelModel: Model<ChannelDocument>,
@@ -276,6 +278,13 @@ export class HomepageService {
     }
 
     const sorted = [...channels].sort((a, b) => {
+      const aIsPrimary = a.slug === this.PRIMARY_HOME_CHANNEL_SLUG;
+      const bIsPrimary = b.slug === this.PRIMARY_HOME_CHANNEL_SLUG;
+
+      if (aIsPrimary !== bIsPrimary) {
+        return aIsPrimary ? -1 : 1;
+      }
+
       const aDefaultId = a.defaultLiveStreamId?.toString();
       const bDefaultId = b.defaultLiveStreamId?.toString();
 
