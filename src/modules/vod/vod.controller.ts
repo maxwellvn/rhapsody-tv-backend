@@ -117,6 +117,7 @@ export class VodController {
   @ApiParam({ name: 'videoId', description: 'Video ID' })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
+  @ApiQuery({ name: 'sort', required: false, enum: ['newest', 'top'], example: 'newest' })
   @ApiOkSuccessResponse({
     description: 'Comments retrieved successfully',
     model: VodPaginatedCommentsResponseDto,
@@ -125,8 +126,9 @@ export class VodController {
     @Param('videoId') videoId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('sort') sort?: 'newest' | 'top',
   ) {
-    const result = await this.vodService.getComments(videoId, page, limit);
+    const result = await this.vodService.getComments(videoId, page, limit, sort);
     return {
       success: true,
       message: 'Comments retrieved successfully',

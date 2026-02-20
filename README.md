@@ -25,6 +25,35 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## KingsChat Authentication Setup
+
+1. Copy `.env.example` to `.env` and fill core app values.
+2. Set the KingsChat variables in `.env`:
+   - `KINGSCHAT_PROFILE_URL`
+   - `KINGSCHAT_CLIENT_ID`
+   - `KINGSCHAT_CLIENT_VERSION`
+   - `KINGSCHAT_DEVICE_ID`
+   - `KINGSCHAT_PLATFORM`
+   - `KINGSCHAT_REQUEST_TIMEOUT_MS`
+3. Start the API:
+
+```bash
+pnpm install
+pnpm start:dev
+```
+
+4. Exchange a KingsChat access token for backend JWTs:
+
+```bash
+curl -X POST http://localhost:3000/auth/kingschat \
+  -H "Content-Type: application/json" \
+  -d '{"accessToken":"<kingschat-access-token>"}'
+```
+
+5. Use returned backend `accessToken`/`refreshToken` for authenticated API calls.
+
+Detailed frontend integration flow is documented in `KINGSCHAT_FRONTEND_INTEGRATION.md`.
+
 ## Project setup
 
 ```bash

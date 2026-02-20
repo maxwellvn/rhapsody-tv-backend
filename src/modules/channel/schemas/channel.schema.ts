@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
+import { HydratedDocument, Types } from 'mongoose';
 
 export type ChannelDocument = HydratedDocument<Channel>;
 
@@ -28,6 +28,9 @@ export class Channel {
 
   @Prop({ trim: true })
   websiteUrl?: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'LiveStream' })
+  defaultLiveStreamId?: Types.ObjectId;
 
   @Prop({ default: true })
   isActive: boolean;

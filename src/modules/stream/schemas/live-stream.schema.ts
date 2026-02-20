@@ -10,6 +10,11 @@ export enum LiveStreamStatus {
   CANCELED = 'canceled',
 }
 
+export enum LiveStreamScheduleType {
+  CONTINUOUS = 'continuous',
+  SCHEDULED = 'scheduled',
+}
+
 @Schema({ timestamps: true })
 export class LiveStream {
   @Prop({ type: Types.ObjectId, ref: 'Channel', required: true, index: true })
@@ -23,6 +28,17 @@ export class LiveStream {
 
   @Prop({
     required: true,
+    enum: LiveStreamScheduleType,
+    default: LiveStreamScheduleType.SCHEDULED,
+    index: true,
+  })
+  scheduleType: LiveStreamScheduleType;
+
+  @Prop({ type: Types.ObjectId, ref: 'Program' })
+  programId?: Types.ObjectId;
+
+  @Prop({
+    required: true,
     enum: LiveStreamStatus,
     default: LiveStreamStatus.SCHEDULED,
   })
@@ -30,6 +46,9 @@ export class LiveStream {
 
   @Prop({ index: true })
   scheduledStartAt?: Date;
+
+  @Prop({ index: true })
+  scheduledEndAt?: Date;
 
   @Prop()
   startedAt?: Date;

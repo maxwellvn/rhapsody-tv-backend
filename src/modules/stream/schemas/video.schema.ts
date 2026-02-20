@@ -14,6 +14,9 @@ export class Video {
   @Prop({ type: Types.ObjectId, ref: 'Channel', required: true, index: true })
   channelId: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, ref: 'Program', index: true })
+  programId?: Types.ObjectId;
+
   @Prop({ required: true, trim: true })
   title: string;
 
@@ -55,6 +58,7 @@ export const VideoSchema = SchemaFactory.createForClass(Video);
 
 // Indexes
 VideoSchema.index({ channelId: 1, createdAt: -1 });
+VideoSchema.index({ programId: 1, createdAt: -1 });
 VideoSchema.index({ visibility: 1, publishedAt: -1 });
 VideoSchema.index({ isActive: 1 });
 

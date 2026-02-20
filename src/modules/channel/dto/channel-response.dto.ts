@@ -22,6 +22,9 @@ export class ChannelDetailsDto {
   @ApiPropertyOptional({ example: 'https://example.com' })
   websiteUrl?: string;
 
+  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439011' })
+  defaultLiveStreamId?: string;
+
   @ApiProperty({ example: 0 })
   subscriberCount: number;
 
@@ -35,6 +38,9 @@ export class ChannelDetailsDto {
 export class ChannelVideoListItemDto {
   @ApiProperty({ description: 'Video ID' })
   id: string;
+
+  @ApiPropertyOptional({ description: 'Program ID linked to this video' })
+  programId?: string;
 
   @ApiProperty({ description: 'Video title' })
   title: string;
@@ -68,6 +74,21 @@ export class ChannelProgramDto {
   @ApiPropertyOptional({ example: 'Start your day with us' })
   description?: string;
 
+  @ApiPropertyOptional({ enum: ['daily', 'weekly', 'once'], example: 'daily' })
+  scheduleType?: string;
+
+  @ApiPropertyOptional({ example: '08:00' })
+  startTimeOfDay?: string;
+
+  @ApiPropertyOptional({ example: '09:00' })
+  endTimeOfDay?: string;
+
+  @ApiPropertyOptional({ type: [Number], example: [1, 3, 5] })
+  daysOfWeek?: number[];
+
+  @ApiPropertyOptional({ example: 'UTC' })
+  timezone?: string;
+
   @ApiProperty({ example: '2026-01-15T08:00:00.000Z' })
   startTime: string;
 
@@ -94,6 +115,47 @@ export class ChannelProgramDto {
 
   @ApiPropertyOptional({ example: '507f1f77bcf86cd799439011' })
   liveStreamId?: string;
+}
+
+export class ChannelLivestreamDto {
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  id: string;
+
+  @ApiProperty({ example: 'Rhapsody Daily Devotional Live' })
+  title: string;
+
+  @ApiPropertyOptional({ example: 'Join us for the daily reading' })
+  description?: string;
+
+  @ApiPropertyOptional({ enum: ['continuous', 'scheduled'], example: 'continuous' })
+  scheduleType?: string;
+
+  @ApiProperty({ enum: ['scheduled', 'live', 'ended', 'canceled'], example: 'live' })
+  status: string;
+
+  @ApiPropertyOptional({ example: '2026-01-15T20:00:00.000Z' })
+  scheduledStartAt?: string;
+
+  @ApiPropertyOptional({ example: '2026-01-15T22:00:00.000Z' })
+  scheduledEndAt?: string;
+
+  @ApiPropertyOptional({ example: '2026-01-15T20:00:00.000Z' })
+  startedAt?: string;
+
+  @ApiPropertyOptional({ example: '2026-01-15T22:00:00.000Z' })
+  endedAt?: string;
+
+  @ApiPropertyOptional({ example: 'https://ik.imagekit.io/...' })
+  thumbnailUrl?: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/live/stream.m3u8' })
+  playbackUrl?: string;
+
+  @ApiProperty({ example: true })
+  isChatEnabled: boolean;
+
+  @ApiProperty({ example: false })
+  isDefaultForChannel: boolean;
 }
 
 export class ChannelVideosPaginatedDto {

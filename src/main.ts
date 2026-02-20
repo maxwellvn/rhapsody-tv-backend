@@ -1,8 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger, type Type } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
+import { mkdir } from 'fs/promises';
+import { join } from 'path';
 import { AppModule } from './app.module';
 import { AuthModule } from './modules/auth';
 import { UserModule } from './modules/user';
@@ -16,7 +19,7 @@ import { MailModule } from './modules/mail/mail.module';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port', 3000);
@@ -38,6 +41,11 @@ async function bootstrap() {
 
   // Global prefix
   app.setGlobalPrefix('v1');
+
+  // Serve local uploads in development/fallback mode.
+  const uploadsRoot = join(process.cwd(), 'uploads');
+  await mkdir(join(uploadsRoot, 'avatars'), { recursive: true });
+  app.useStaticAssets(uploadsRoot, { prefix: '/uploads' });
 
   // Validation
   app.useGlobalPipes(

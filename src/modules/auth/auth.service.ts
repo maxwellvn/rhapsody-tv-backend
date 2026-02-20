@@ -1,6 +1,7 @@
 import {
   Injectable,
   UnauthorizedException,
+  Logger,
   Inject,
   ForbiddenException,
   NotFoundException,
@@ -20,6 +21,8 @@ import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
@@ -82,6 +85,9 @@ export class AuthService {
         id: user._id,
         email: user.email,
         fullName: user.fullName,
+        username: user.kingsChatUsername,
+        avatar: user.avatar,
+        gender: user.gender,
         roles: user.roles,
         isEmailVerified: user.isEmailVerified,
       },
@@ -175,6 +181,9 @@ export class AuthService {
         id: user._id,
         email: user.email,
         fullName: user.fullName,
+        username: user.kingsChatUsername,
+        avatar: user.avatar,
+        gender: user.gender,
         roles: user.roles,
         isEmailVerified: user.isEmailVerified,
       },
@@ -187,11 +196,17 @@ export class AuthService {
 
     const userId =
       this.pickString(profile, ['user_id']) ??
+      this.pickString(profile, ['userId']) ??
       this.pickString(profile, ['profile', 'user_id']) ??
+      this.pickString(profile, ['profile', 'userId']) ??
       this.pickString(profile, ['user', 'user_id']) ??
+      this.pickString(profile, ['user', 'userId']) ??
+      this.pickString(profile, ['profile', 'user', 'user_id']) ??
+      this.pickString(profile, ['profile', 'user', 'userId']) ??
       this.pickString(profile, ['id']) ??
       this.pickString(profile, ['profile', 'id']) ??
-      this.pickString(profile, ['user', 'id']);
+      this.pickString(profile, ['user', 'id']) ??
+      this.pickString(profile, ['profile', 'user', 'id']);
 
     if (!userId) {
       throw new UnauthorizedException(
@@ -201,8 +216,13 @@ export class AuthService {
 
     const providerEmail =
       this.pickString(profile, ['email']) ??
+      this.pickString(profile, ['email', 'address']) ??
       this.pickString(profile, ['profile', 'email']) ??
-      this.pickString(profile, ['user', 'email']);
+      this.pickString(profile, ['profile', 'email', 'address']) ??
+      this.pickString(profile, ['user', 'email']) ??
+      this.pickString(profile, ['user', 'email', 'address']) ??
+      this.pickString(profile, ['profile', 'user', 'email']) ??
+      this.pickString(profile, ['profile', 'user', 'email', 'address']);
 
     const safeUserId = userId.toLowerCase().replace(/[^a-z0-9._-]/g, '_');
     const email = providerEmail || `kingschat_${safeUserId}@kingschat.local`;
@@ -213,22 +233,59 @@ export class AuthService {
       this.pickString(profile, ['name']) ??
       this.pickString(profile, ['display_name']) ??
       this.pickString(profile, ['profile', 'full_name']) ??
+      this.pickString(profile, ['profile', 'fullName']) ??
       this.pickString(profile, ['profile', 'name']) ??
+      this.pickString(profile, ['profile', 'display_name']) ??
       this.pickString(profile, ['user', 'full_name']) ??
+      this.pickString(profile, ['user', 'fullName']) ??
       this.pickString(profile, ['user', 'name']) ??
+      this.pickString(profile, ['profile', 'user', 'full_name']) ??
+      this.pickString(profile, ['profile', 'user', 'fullName']) ??
+      this.pickString(profile, ['profile', 'user', 'name']) ??
+      this.pickString(profile, ['profile', 'user', 'display_name']) ??
       'KingsChat User';
 
     const kingsChatUsername =
       this.pickString(profile, ['username']) ??
       this.pickString(profile, ['profile', 'username']) ??
       this.pickString(profile, ['user', 'username']) ??
+      this.pickString(profile, ['profile', 'user', 'username']) ??
       this.pickString(profile, ['handle']);
+    const kingsChatAvatar =
+      this.pickString(profile, ['avatar']) ??
+      this.pickString(profile, ['avatar_url']) ??
+      this.pickString(profile, ['avatarUrl']) ??
+      this.pickString(profile, ['profile_picture']) ??
+      this.pickString(profile, ['profilePicture']) ??
+      this.pickString(profile, ['picture']) ??
+      this.pickString(profile, ['photo']) ??
+      this.pickString(profile, ['profile', 'avatar']) ??
+      this.pickString(profile, ['profile', 'avatar_url']) ??
+      this.pickString(profile, ['profile', 'avatarUrl']) ??
+      this.pickString(profile, ['profile', 'profile_picture']) ??
+      this.pickString(profile, ['profile', 'profilePicture']) ??
+      this.pickString(profile, ['user', 'avatar']) ??
+      this.pickString(profile, ['user', 'avatar_url']) ??
+      this.pickString(profile, ['user', 'avatarUrl']) ??
+      this.pickString(profile, ['user', 'profile_picture']) ??
+      this.pickString(profile, ['user', 'profilePicture']) ??
+      this.pickString(profile, ['profile', 'user', 'avatar']) ??
+      this.pickString(profile, ['profile', 'user', 'avatar_url']) ??
+      this.pickString(profile, ['profile', 'user', 'avatarUrl']) ??
+      this.pickString(profile, ['profile', 'user', 'profile_picture']) ??
+      this.pickString(profile, ['profile', 'user', 'profilePicture']) ??
+      this.pickString(profile, ['avatar', 'url']) ??
+      this.pickString(profile, ['profile', 'avatar', 'url']) ??
+      this.pickString(profile, ['user', 'avatar', 'url']) ??
+      this.pickString(profile, ['picture', 'url']) ??
+      this.pickString(profile, ['photo', 'url']);
 
     const user = await this.findOrCreateKingsChatUser({
       kingsChatUserId: userId,
       email,
       fullName,
       kingsChatUsername,
+      avatar: kingsChatAvatar,
     });
 
     return this.login(user);
@@ -288,6 +345,7 @@ export class AuthService {
     email: string;
     fullName: string;
     kingsChatUsername?: string;
+    avatar?: string;
   }): Promise<UserDocument> {
     const kingsChatUserService = this.userService as unknown as {
       findOrCreateFromKingsChat: (payload: {
@@ -295,6 +353,7 @@ export class AuthService {
         email: string;
         fullName: string;
         kingsChatUsername?: string;
+        avatar?: string;
       }) => Promise<UserDocument>;
     };
 
@@ -304,27 +363,46 @@ export class AuthService {
   private async fetchKingsChatProfile(
     accessToken: string,
   ): Promise<Record<string, unknown>> {
-    try {
-      const response = await axios.get(this.kingsChat.profileUrl, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: 'application/json',
-          'X-Client-Id': this.kingsChat.clientId,
-          'X-Client-Version': this.kingsChat.clientVersion,
-          'X-Device-Id': this.kingsChat.deviceId,
-          'X-Platform': this.kingsChat.platform,
-        },
-        timeout: this.kingsChat.requestTimeoutMs,
-      });
+    const profileUrls = Array.from(
+      new Set([
+        this.kingsChat.profileUrl,
+        'https://connect.kingsch.at/api/profile',
+        'https://connect.kingsch.at/api/v1/users/me',
+      ]),
+    );
 
-      if (!response.data || typeof response.data !== 'object') {
-        throw new UnauthorizedException('Invalid response from KingsChat');
+    for (const profileUrl of profileUrls) {
+      try {
+        const response = await axios.get(profileUrl, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          timeout: this.kingsChat.requestTimeoutMs,
+          validateStatus: () => true,
+        });
+
+        if (response.status >= 200 && response.status < 300) {
+          if (!response.data || typeof response.data !== 'object') {
+            continue;
+          }
+          return response.data as Record<string, unknown>;
+        }
+
+        this.logger.warn(
+          `KingsChat profile fetch failed (${response.status}) at ${profileUrl}`,
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Unknown error';
+        this.logger.warn(
+          `KingsChat profile fetch error at ${profileUrl}: ${message}`,
+        );
       }
-
-      return response.data as Record<string, unknown>;
-    } catch {
-      throw new UnauthorizedException('Invalid KingsChat access token');
     }
+
+    throw new UnauthorizedException('Invalid KingsChat access token');
   }
 
   private pickString(

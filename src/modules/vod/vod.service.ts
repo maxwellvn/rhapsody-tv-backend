@@ -145,13 +145,17 @@ export class VodService {
   /**
    * Get comments for a video with nested replies
    */
-  async getComments(videoId: string, page = 1, limit = 20) {
+  async getComments(videoId: string, page = 1, limit = 20, sort: 'newest' | 'top' = 'newest') {
     if (!Types.ObjectId.isValid(videoId)) {
       throw new BadRequestException('Invalid video ID');
     }
 
     const skip = (page - 1) * limit;
     const videoObjectId = new Types.ObjectId(videoId);
+    const sortOrder: Record<string, 1 | -1> =
+      sort === 'top'
+        ? { likeCount: -1, createdAt: -1 }
+        : { createdAt: -1 };
 
     // Get top-level comments (no parentCommentId)
     const [topLevelComments, total] = await Promise.all([
@@ -161,10 +165,10 @@ export class VodService {
           parentCommentId: { $exists: false },
           isDeleted: false,
         })
-        .sort({ createdAt: -1 })
+        .sort(sortOrder)
         .skip(skip)
         .limit(limit)
-        .populate('userId', 'fullName')
+        .populate('userId', 'fullName avatar gender')
         .exec(),
       this.videoCommentModel.countDocuments({
         videoId: videoObjectId,
@@ -181,7 +185,7 @@ export class VodService {
         isDeleted: false,
       })
       .sort({ createdAt: 1 })
-      .populate('userId', 'fullName')
+      .populate('userId', 'fullName avatar gender')
       .exec();
 
     // Group replies by parent comment
@@ -236,7 +240,7 @@ export class VodService {
     });
 
     // Populate user info
-    await comment.populate('userId', 'fullName');
+    await comment.populate('userId', 'fullName avatar gender');
 
     return this.formatCommentResponse(comment);
   }
@@ -298,7 +302,7 @@ export class VodService {
     });
 
     // Populate user info
-    await reply.populate('userId', 'fullName');
+    await reply.populate('userId', 'fullName avatar gender');
 
     return this.formatCommentResponse(reply);
   }
@@ -437,6 +441,8 @@ export class VodService {
     const userData = comment.userId as unknown as {
       _id: Types.ObjectId;
       fullName: string;
+      avatar?: string;
+      gender?: 'male' | 'female';
     };
     return {
       id: comment._id.toString(),
@@ -445,6 +451,8 @@ export class VodService {
       user: {
         id: userData?._id?.toString() || comment.userId.toString(),
         fullName: userData?.fullName || 'Unknown User',
+        avatar: userData?.avatar,
+        gender: userData?.gender,
       },
       parentCommentId: comment.parentCommentId?.toString(),
       likeCount: comment.likeCount || 0,

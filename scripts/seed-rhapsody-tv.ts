@@ -11,6 +11,19 @@ import {
 } from '../src/modules/stream/schemas/video.schema';
 import { ProgramSchema } from '../src/modules/channel/schemas/program.schema';
 
+const REAL_CHANNEL = {
+  name: 'Rhapsody TV',
+  slug: 'rhapsody-tv',
+  description: 'The official channel for Rhapsody of Realities TV.',
+  logoUrl: 'https://rhapsodyofrealities.b-cdn.net/rhapsodytv/logo/rtv-logo_new.png',
+  coverImageUrl:
+    'https://rhapsodyofrealities.b-cdn.net/rhapsodytv/logo/rtv-logo_new.png',
+  websiteUrl: 'https://rhapsodyofrealities.org',
+};
+
+const REAL_HLS_URL =
+  'https://2nbyjxnbl53k-hls-live.5centscdn.com/RTV/59a49be6dc0f146c57cd9ee54da323b1.sdp/playlist.m3u8';
+
 async function seed() {
   const uri = process.env.MONGODB_URI;
   if (!uri) {
@@ -28,8 +41,36 @@ async function seed() {
   const VideoModel = mongoose.model('Video', VideoSchema);
   const ProgramModel = mongoose.model('Program', ProgramSchema);
 
-  // 1. Clean up existing "Rhapsody TV" data
+  // 1. Clean up existing channel data and any rows with mock URLs.
   console.log('Cleaning up old data...');
+
+  const mockUrlPattern = /(loremflickr\.com|test-streams\.mux\.dev|ik\.imagekit\.io\/\.\.\.)/i;
+
+  const mockChannels = await ChannelModel.find({
+    $or: [{ logoUrl: mockUrlPattern }, { coverImageUrl: mockUrlPattern }],
+  }).select('_id');
+
+  const mockChannelIds = mockChannels.map((c) => c._id);
+  if (mockChannelIds.length > 0) {
+    await LiveStreamModel.deleteMany({ channelId: { $in: mockChannelIds } });
+    await VideoModel.deleteMany({ channelId: { $in: mockChannelIds } });
+    await ProgramModel.deleteMany({ channelId: { $in: mockChannelIds } });
+    await ChannelModel.deleteMany({ _id: { $in: mockChannelIds } });
+    console.log(`Removed ${mockChannelIds.length} channel(s) with mock URLs.`);
+  }
+
+  await LiveStreamModel.deleteMany({
+    $or: [{ thumbnailUrl: mockUrlPattern }, { playbackUrl: mockUrlPattern }],
+  });
+  await VideoModel.deleteMany({
+    $or: [{ thumbnailUrl: mockUrlPattern }, { playbackUrl: mockUrlPattern }],
+  });
+
+  // Remove invalid program rows that can break homepage mapping.
+  await ProgramModel.deleteMany({
+    $or: [{ startTime: { $exists: false } }, { endTime: { $exists: false } }],
+  });
+
   const existingChannel = await ChannelModel.findOne({ slug: 'rhapsody-tv' });
   if (existingChannel) {
     const channelId = existingChannel._id;
@@ -43,14 +84,9 @@ async function seed() {
   // 2. Create Channel
   console.log('Creating Rhapsody TV Channel...');
   const channel = await ChannelModel.create({
-    name: 'Rhapsody TV',
-    slug: 'rhapsody-tv',
-    description: 'The official channel for Rhapsody of Realities TV.',
-    logoUrl: 'https://loremflickr.com/200/200/abstract,geometry',
-    coverImageUrl: 'https://loremflickr.com/1200/300/broadcast,studio',
-    subscriberCount: 10500,
-    videoCount: 5,
-    websiteUrl: 'https://rhapsodyofrealities.org',
+    ...REAL_CHANNEL,
+    subscriberCount: 0,
+    videoCount: 4,
     isActive: true,
   });
   console.log(`Channel created: ${channel.name} (${channel._id})`);
@@ -63,10 +99,10 @@ async function seed() {
     description: 'Join us for the daily reading of Rhapsody of Realities.',
     status: LiveStreamStatus.LIVE,
     startedAt: new Date(),
-    thumbnailUrl: 'https://loremflickr.com/1280/720/reading,bible',
+    thumbnailUrl:
+      'https://rhapsodyofrealities.b-cdn.net/rhapsodytv/thumbnails/travels-suriname-wales.png',
     isChatEnabled: true,
-    // Add dummy streaming URLs
-    playbackUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    playbackUrl: REAL_HLS_URL,
     rtmpUrl: 'rtmp://live.rhapsody.tv/app',
     streamKey: 'live_key_123',
   });
@@ -77,7 +113,9 @@ async function seed() {
     description: 'Weekly prayer session.',
     status: LiveStreamStatus.SCHEDULED,
     scheduledStartAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
-    thumbnailUrl: 'https://loremflickr.com/1280/720/prayer,worship',
+    thumbnailUrl:
+      'https://rhapsodyofrealities.b-cdn.net/rhapsodytv/thumbnails/travels-suriname-wales.png',
+    playbackUrl: REAL_HLS_URL,
     isChatEnabled: true,
   });
 
@@ -86,11 +124,13 @@ async function seed() {
   const videos = await VideoModel.create([
     {
       channelId: channel._id,
-      title: 'Miracles in Motion',
-      description: 'Testimonies from around the world.',
-      playbackUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      thumbnailUrl: 'https://loremflickr.com/1280/720/happy,miracle',
-      durationSeconds: 1200,
+      title: 'RHAPSODY TRAVELS SURINAME AND WALES',
+      description: 'Rhapsody Travels special edition.',
+      playbackUrl:
+        'https://d1ent1.loveworldcloud.com/~rorm/Rhapsody%20Travels%20-2025/NEW/R_%20Travels_Suriname_Updated_2025.mp4',
+      thumbnailUrl:
+        'https://rhapsodyofrealities.b-cdn.net/rhapsodytv/thumbnails/travels-suriname-wales.png',
+      durationSeconds: 3000,
       visibility: VideoVisibility.PUBLIC,
       viewCount: 5020,
       likeCount: 300,
@@ -100,8 +140,9 @@ async function seed() {
       channelId: channel._id,
       title: 'Rhapsody News Update',
       description: 'Latest news from the ministry.',
-      playbackUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      thumbnailUrl: 'https://loremflickr.com/1280/720/news,studio',
+      playbackUrl: REAL_HLS_URL,
+      thumbnailUrl:
+        'https://rhapsodyofrealities.b-cdn.net/rhapsodytv/thumbnails/travels-suriname-wales.png',
       durationSeconds: 300,
       visibility: VideoVisibility.PUBLIC,
       viewCount: 1200,
@@ -112,8 +153,9 @@ async function seed() {
       channelId: channel._id,
       title: 'Partner Conference Highlights',
       description: 'Moments from the recent conference.',
-      playbackUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      thumbnailUrl: 'https://loremflickr.com/1280/720/conference,audience',
+      playbackUrl: REAL_HLS_URL,
+      thumbnailUrl:
+        'https://rhapsodyofrealities.b-cdn.net/rhapsodytv/thumbnails/travels-suriname-wales.png',
       durationSeconds: 3600,
       visibility: VideoVisibility.PUBLIC,
       viewCount: 8000,
@@ -124,25 +166,14 @@ async function seed() {
       channelId: channel._id,
       title: 'Understanding Faith',
       description: 'Teaching series part 1.',
-      playbackUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      thumbnailUrl: 'https://loremflickr.com/1280/720/church,cross',
+      playbackUrl: REAL_HLS_URL,
+      thumbnailUrl:
+        'https://rhapsodyofrealities.b-cdn.net/rhapsodytv/thumbnails/travels-suriname-wales.png',
       durationSeconds: 1800,
       visibility: VideoVisibility.PUBLIC,
       viewCount: 2500,
       likeCount: 200,
       publishedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-    },
-    {
-      channelId: channel._id,
-      title: 'Internal Briefing',
-      description: 'Staff only content.',
-      playbackUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      thumbnailUrl: 'https://loremflickr.com/1280/720/meeting,business',
-      durationSeconds: 600,
-      visibility: VideoVisibility.PRIVATE,
-      viewCount: 10,
-      likeCount: 5,
-      publishedAt: new Date(),
     },
   ]);
 
@@ -191,7 +222,7 @@ async function seed() {
     viewerCount: 0,
   });
 
-  console.log('Successfully seeded Rhapsody TV data.');
+  console.log('Successfully seeded Rhapsody TV data (mock URLs removed).');
   await mongoose.disconnect();
 }
 

@@ -16,6 +16,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import {
@@ -38,6 +39,8 @@ import {
 } from '../../common/swagger';
 import { WatchlistService } from './watchlist.service';
 import { WatchHistoryService } from './watch-history.service';
+import { UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -48,6 +51,18 @@ export class UserController {
     private readonly watchlistService: WatchlistService,
     private readonly watchHistoryService: WatchHistoryService,
   ) {}
+
+  private formatUserResponse(user: UserDocument): Record<string, unknown> {
+    const plainUser = user.toJSON() as unknown as Record<string, unknown>;
+    const username =
+      (plainUser.username as string | undefined) ??
+      (plainUser.kingsChatUsername as string | undefined);
+
+    return {
+      ...plainUser,
+      username,
+    };
+  }
 
   @Post()
   @Roles(Role.ADMIN)
@@ -62,7 +77,7 @@ export class UserController {
     return {
       success: true,
       message: 'User created successfully',
-      data: user,
+      data: this.formatUserResponse(user),
     };
   }
 
@@ -95,7 +110,24 @@ export class UserController {
     return {
       success: true,
       message: 'Profile retrieved successfully',
-      data: fullUser,
+      data: this.formatUserResponse(fullUser),
+    };
+  }
+
+  @Post('me/avatar')
+  @ApiOperation({ summary: 'Upload current user avatar' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOkSuccessResponse({ description: 'Avatar uploaded successfully' })
+  async uploadAvatar(
+    @CurrentUser('sub') userId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const avatar = await this.userService.uploadAvatar(userId, file);
+    return {
+      success: true,
+      message: 'Avatar uploaded successfully',
+      data: { avatar },
     };
   }
 
@@ -112,7 +144,7 @@ export class UserController {
     return {
       success: true,
       message: 'User retrieved successfully',
-      data: user,
+      data: this.formatUserResponse(user),
     };
   }
 
@@ -138,7 +170,7 @@ export class UserController {
     return {
       success: true,
       message: 'Profile updated successfully',
-      data: updatedUser,
+      data: this.formatUserResponse(updatedUser),
     };
   }
 
@@ -299,7 +331,7 @@ export class UserController {
     return {
       success: true,
       message: 'User updated successfully',
-      data: user,
+      data: this.formatUserResponse(user),
     };
   }
 

@@ -9,6 +9,7 @@ export enum NotificationType {
   CHANNEL_NEW_PROGRAM = 'channel_new_program',
   COMMENT_LIKED = 'comment_liked',
   COMMENT_REPLIED = 'comment_replied',
+  ANNOUNCEMENT = 'announcement',
 }
 
 @Schema({ timestamps: true })

@@ -38,6 +38,7 @@ import { AdminUsersController } from './controllers/admin-users.controller';
 import { AdminVideosController } from './controllers/admin-videos.controller';
 import { AdminProgramsController } from './controllers/admin-programs.controller';
 import { AdminUploadController } from './controllers/admin-upload.controller';
+import { AdminNotificationsController } from './controllers/admin-notifications.controller';
 import { AdminChannelsService } from './services/admin-channels.service';
 import { AdminDashboardService } from './services/admin-dashboard.service';
 import { AdminLivestreamsService } from './services/admin-livestreams.service';
@@ -45,6 +46,7 @@ import { AdminModerationService } from './services/admin-moderation.service';
 import { AdminUsersService } from './services/admin-users.service';
 import { AdminVideosService } from './services/admin-videos.service';
 import { AdminProgramsService } from './services/admin-programs.service';
+import { AdminNotificationsService } from './services/admin-notifications.service';
 import { NotificationsModule } from '../notifications';
 
 @Module({
@@ -74,6 +76,7 @@ import { NotificationsModule } from '../notifications';
     AdminVideosController,
     AdminProgramsController,
     AdminUploadController,
+    AdminNotificationsController,
   ],
   providers: [
     AdminChannelsService,
@@ -83,6 +86,7 @@ import { NotificationsModule } from '../notifications';
     AdminModerationService,
     AdminVideosService,
     AdminProgramsService,
+    AdminNotificationsService,
   ],
 })
 export class AdminModule {}

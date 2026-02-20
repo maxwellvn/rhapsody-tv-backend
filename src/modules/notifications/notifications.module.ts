@@ -10,6 +10,9 @@ import { NotificationsService } from './notifications.service';
 import { NotificationsController } from './notifications.controller';
 import { SubscriptionsController } from './subscriptions.controller';
 import { Channel, ChannelSchema } from '../channel/schemas/channel.schema';
+import { Program, ProgramSchema } from '../channel/schemas/program.schema';
+import { Video, VideoSchema } from '../stream/schemas/video.schema';
+import { LiveStream, LiveStreamSchema } from '../stream/schemas/live-stream.schema';
 
 @Module({
   imports: [
@@ -17,6 +20,9 @@ import { Channel, ChannelSchema } from '../channel/schemas/channel.schema';
       { name: Notification.name, schema: NotificationSchema },
       { name: ChannelSubscription.name, schema: ChannelSubscriptionSchema },
       { name: Channel.name, schema: ChannelSchema },
+      { name: Program.name, schema: ProgramSchema },
+      { name: Video.name, schema: VideoSchema },
+      { name: LiveStream.name, schema: LiveStreamSchema },
     ]),
   ],
   controllers: [NotificationsController, SubscriptionsController],

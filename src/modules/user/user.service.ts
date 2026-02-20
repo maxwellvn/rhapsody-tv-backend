@@ -2,15 +2,20 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
+import { mkdir, writeFile } from 'fs/promises';
+import { extname, join } from 'path';
 import { User, UserDocument, type UserSettings } from './schemas/user.schema';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateUserSettingsDto } from './dto/user-settings.dto';
+import { ImageKitService } from '../../shared/services/imagekit/imagekit.service';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -44,13 +49,18 @@ function deepMerge<T extends object>(base: T, patch: DeepPartial<T>): T {
 
 @Injectable()
 export class UserService {
-  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private readonly imageKitService: ImageKitService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async findOrCreateFromKingsChat(input: {
     kingsChatUserId: string;
     email: string;
     fullName: string;
     kingsChatUsername?: string;
+    avatar?: string;
   }): Promise<UserDocument> {
     const normalizedEmail = input.email.toLowerCase();
 
@@ -67,6 +77,9 @@ export class UserService {
       user.email = normalizedEmail;
       user.kingsChatUserId = input.kingsChatUserId;
       user.kingsChatUsername = input.kingsChatUsername;
+      if (input.avatar && this.shouldAdoptKingsChatAvatar(user.avatar)) {
+        user.avatar = input.avatar;
+      }
       user.isEmailVerified = true;
       return user.save();
     }
@@ -80,6 +93,7 @@ export class UserService {
       password: hashedPassword,
       kingsChatUserId: input.kingsChatUserId,
       kingsChatUsername: input.kingsChatUsername,
+      avatar: input.avatar,
       isEmailVerified: true,
     });
 
@@ -241,5 +255,101 @@ export class UserService {
     }
 
     return updated.settings;
+  }
+
+  async uploadAvatar(
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<string> {
+    if (!file) {
+      throw new BadRequestException('Avatar file is required');
+    }
+
+    if (!file.mimetype?.startsWith('image/')) {
+      throw new BadRequestException('Only image files are supported');
+    }
+
+    const avatarUrl = await this.uploadAvatarFile(file);
+
+    const updated = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        { avatar: avatarUrl },
+        { new: true, runValidators: true },
+      )
+      .select('avatar');
+
+    if (!updated) {
+      throw new NotFoundException('User not found');
+    }
+
+    return updated.avatar || avatarUrl;
+  }
+
+  private shouldAdoptKingsChatAvatar(existingAvatar?: string): boolean {
+    if (!existingAvatar) return true;
+    return /^(male|female):\d+$/i.test(existingAvatar);
+  }
+
+  private async uploadAvatarFile(file: Express.Multer.File): Promise<string> {
+    if (this.isImageKitConfigured()) {
+      try {
+        const upload = await Promise.race([
+          this.imageKitService.uploadFile(file, 'rhapsody-tv/avatars'),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('ImageKit upload timed out')),
+              8000,
+            ),
+          ),
+        ]);
+        return upload.url;
+      } catch {
+        // Fall through to local storage fallback for development resilience.
+      }
+    }
+
+    return this.uploadAvatarToLocal(file);
+  }
+
+  private isImageKitConfigured(): boolean {
+    const publicKey = this.configService.get<string>('imagekit.publicKey') || '';
+    const privateKey =
+      this.configService.get<string>('imagekit.privateKey') || '';
+    const urlEndpoint =
+      this.configService.get<string>('imagekit.urlEndpoint') || '';
+
+    const hasRequiredValues =
+      publicKey.trim().length > 0 &&
+      privateKey.trim().length > 0 &&
+      urlEndpoint.trim().length > 0;
+
+    const hasPlaceholderValues =
+      publicKey.startsWith('local_dev_') ||
+      privateKey.startsWith('local_dev_') ||
+      /local-dev/i.test(urlEndpoint);
+
+    return hasRequiredValues && !hasPlaceholderValues;
+  }
+
+  private async uploadAvatarToLocal(file: Express.Multer.File): Promise<string> {
+    const uploadsDir = join(process.cwd(), 'uploads', 'avatars');
+    await mkdir(uploadsDir, { recursive: true });
+
+    const rawExt = extname(file.originalname || '').toLowerCase();
+    const extension =
+      rawExt === '.png' ||
+      rawExt === '.jpg' ||
+      rawExt === '.jpeg' ||
+      rawExt === '.webp' ||
+      rawExt === '.gif'
+        ? rawExt
+        : '.jpg';
+
+    const fileName = `avatar-${Date.now()}-${randomBytes(6).toString('hex')}${extension}`;
+    const filePath = join(uploadsDir, fileName);
+    await writeFile(filePath, file.buffer);
+
+    return `/uploads/avatars/${fileName}`;
   }
 }

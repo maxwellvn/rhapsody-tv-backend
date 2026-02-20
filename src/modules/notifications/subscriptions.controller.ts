@@ -13,6 +13,7 @@ import {
   ChannelSubscription,
   ChannelSubscriptionDocument,
 } from './schemas/channel-subscription.schema';
+import { Channel, ChannelDocument } from '../channel/schemas/channel.schema';
 import {
   ChannelSubscriptionResponseDto,
   CheckSubscriptionResponseDto,
@@ -26,6 +27,8 @@ export class SubscriptionsController {
   constructor(
     @InjectModel(ChannelSubscription.name)
     private readonly subscriptionModel: Model<ChannelSubscriptionDocument>,
+    @InjectModel(Channel.name)
+    private readonly channelModel: Model<ChannelDocument>,
   ) {}
 
   @Get('channels/:channelId')
@@ -77,6 +80,11 @@ export class SubscriptionsController {
     const userObjectId = new Types.ObjectId(userId);
     const channelObjectId = new Types.ObjectId(channelId);
 
+    const existing = await this.subscriptionModel.findOne({
+      userId: userObjectId,
+      channelId: channelObjectId,
+    });
+
     const updated = await this.subscriptionModel.findOneAndUpdate(
       {
         userId: userObjectId,
@@ -96,6 +104,14 @@ export class SubscriptionsController {
       },
       { upsert: true, new: true },
     );
+
+    // Increment subscriberCount only when a new subscription is created
+    if (!existing) {
+      await this.channelModel.updateOne(
+        { _id: channelObjectId },
+        { $inc: { subscriberCount: 1 } },
+      );
+    }
 
     return {
       success: true,
@@ -123,6 +139,14 @@ export class SubscriptionsController {
       userId: userObjectId,
       channelId: channelObjectId,
     });
+
+    // Decrement subscriberCount only when a subscription was actually removed
+    if (deleted) {
+      await this.channelModel.updateOne(
+        { _id: channelObjectId },
+        { $inc: { subscriberCount: -1 } },
+      );
+    }
 
     return {
       success: true,

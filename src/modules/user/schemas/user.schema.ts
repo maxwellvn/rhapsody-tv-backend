@@ -60,6 +60,12 @@ export class User {
   @Prop({ trim: true })
   kingsChatUsername?: string;
 
+  @Prop({ trim: true })
+  avatar?: string;
+
+  @Prop({ enum: ['male', 'female'] })
+  gender?: 'male' | 'female';
+
   @Prop({ required: true, select: false })
   password: string;
 

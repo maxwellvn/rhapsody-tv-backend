@@ -3,6 +3,12 @@ import { HydratedDocument, Types } from 'mongoose';
 
 export type ProgramDocument = HydratedDocument<Program>;
 
+export enum ProgramScheduleType {
+  DAILY = 'daily',
+  WEEKLY = 'weekly',
+  ONCE = 'once',
+}
+
 @Schema({ timestamps: true })
 export class Program {
   @Prop({ type: Types.ObjectId, ref: 'Channel', required: true, index: true })
@@ -13,6 +19,23 @@ export class Program {
 
   @Prop({ trim: true })
   description?: string;
+
+  @Prop({
+    required: true,
+    enum: ProgramScheduleType,
+    default: ProgramScheduleType.ONCE,
+    index: true,
+  })
+  scheduleType: ProgramScheduleType;
+
+  @Prop({ trim: true })
+  startTimeOfDay?: string;
+
+  @Prop({ trim: true })
+  endTimeOfDay?: string;
+
+  @Prop({ type: [Number], default: undefined })
+  daysOfWeek?: number[];
 
   @Prop({ required: true })
   startTime: Date;
@@ -25,6 +48,12 @@ export class Program {
 
   @Prop({ trim: true })
   category?: string;
+
+  @Prop({ trim: true, default: 'UTC' })
+  timezone?: string;
+
+  @Prop({ trim: true })
+  thumbnailUrl?: string;
 
   @Prop({ default: false })
   isLive: boolean;

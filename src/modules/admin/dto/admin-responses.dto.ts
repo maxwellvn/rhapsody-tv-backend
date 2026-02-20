@@ -23,6 +23,9 @@ export class ChannelResponseDto {
   @ApiPropertyOptional({ example: 'https://example.com' })
   websiteUrl?: string;
 
+  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439011' })
+  defaultLiveStreamId?: string;
+
   @ApiProperty({ example: 0 })
   subscriberCount: number;
 
@@ -61,6 +64,9 @@ export class LivestreamResponseDto {
   @ApiPropertyOptional({ example: '2026-01-15T20:00:00.000Z' })
   scheduledStartAt?: string;
 
+  @ApiPropertyOptional({ example: '2026-01-15T21:00:00.000Z' })
+  scheduledEndAt?: string;
+
   @ApiPropertyOptional({ example: '2026-01-15T20:00:00.000Z' })
   startedAt?: string;
 
@@ -79,6 +85,15 @@ export class LivestreamResponseDto {
   @ApiPropertyOptional({ example: 'stream123' })
   streamKey?: string;
 
+  @ApiPropertyOptional({
+    enum: ['continuous', 'scheduled'],
+    example: 'continuous',
+  })
+  scheduleType?: string;
+
+  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439011' })
+  programId?: string;
+
   @ApiProperty({ example: true })
   isChatEnabled: boolean;
 
@@ -95,6 +110,9 @@ export class VideoResponseDto {
 
   @ApiProperty({ example: '507f1f77bcf86cd799439011' })
   channelId: string;
+
+  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439012' })
+  programId?: string;
 
   @ApiProperty({ example: 'My Video Title' })
   title: string;
@@ -143,6 +161,18 @@ export class ProgramResponseDto {
   @ApiPropertyOptional({ example: 'Start your day with us' })
   description?: string;
 
+  @ApiProperty({ enum: ['daily', 'weekly', 'once'], example: 'daily' })
+  scheduleType: string;
+
+  @ApiPropertyOptional({ example: '08:00' })
+  startTimeOfDay?: string;
+
+  @ApiPropertyOptional({ example: '09:00' })
+  endTimeOfDay?: string;
+
+  @ApiPropertyOptional({ type: [Number], example: [1, 3, 5] })
+  daysOfWeek?: number[];
+
   @ApiProperty({ example: '2026-01-15T08:00:00.000Z' })
   startTime: string;
 
@@ -154,6 +184,12 @@ export class ProgramResponseDto {
 
   @ApiPropertyOptional({ example: 'News' })
   category?: string;
+
+  @ApiPropertyOptional({ example: 'UTC' })
+  timezone?: string;
+
+  @ApiPropertyOptional({ example: 'https://ik.imagekit.io/...' })
+  thumbnailUrl?: string;
 
   @ApiProperty({ example: true })
   isActive: boolean;

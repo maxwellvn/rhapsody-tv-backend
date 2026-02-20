@@ -12,6 +12,7 @@ import { ContinueWatchingService } from '../stream/services/continue-watching.se
 import {
   GetHomepageQueryDto,
   HomepageChannelDto,
+  HomepageLivestreamDto,
   HomepageProgramDto,
   HomepageVideoDto,
   HomepageContinueWatchingDto,
@@ -38,6 +39,24 @@ export class HomepageController {
     return {
       success: true,
       message: 'Live now program retrieved successfully',
+      data,
+    };
+  }
+
+  @Public()
+  @Get('livestreams')
+  @ApiOperation({ summary: 'Get currently live livestreams' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiOkSuccessResponse({
+    description: 'Livestreams retrieved successfully',
+    model: HomepageLivestreamDto,
+    isArray: true,
+  })
+  async getLiveStreams(@Query() query: GetHomepageQueryDto) {
+    const data = await this.homepageService.getLiveStreams(query.limit);
+    return {
+      success: true,
+      message: 'Livestreams retrieved successfully',
       data,
     };
   }
@@ -154,6 +173,10 @@ export class HomepageController {
       userId,
       dto.videoId,
       dto.progressSeconds,
+      dto.durationSeconds,
+    );
+    await this.homepageService.backfillVideoDuration(
+      dto.videoId,
       dto.durationSeconds,
     );
 

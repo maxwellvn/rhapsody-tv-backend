@@ -1,14 +1,17 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   UseGuards,
   HttpCode,
   HttpStatus,
   Req,
+  Res,
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -40,6 +43,90 @@ import { Public, CurrentUser } from '../../common/decorators';
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  private appendParamsToRedirect(
+    redirectTo: string,
+    params: Record<string, unknown>,
+  ): string {
+    const redirectUrl = new URL(redirectTo);
+
+    for (const [key, value] of Object.entries(params)) {
+      if (key === 'app_redirect') {
+        continue;
+      }
+
+      if (value === undefined || value === null) {
+        continue;
+      }
+
+      if (Array.isArray(value)) {
+        for (const entry of value) {
+          if (entry !== undefined && entry !== null) {
+            redirectUrl.searchParams.append(key, String(entry));
+          }
+        }
+        continue;
+      }
+
+      redirectUrl.searchParams.set(key, String(value));
+    }
+
+    return redirectUrl.toString();
+  }
+
+  @Public()
+  @Post('kingschat/callback')
+  @HttpCode(HttpStatus.FOUND)
+  @ApiOperation({
+    summary: 'KingsChat OAuth POST callback intermediary',
+  })
+  kingsChatCallbackPost(
+    @Body() body: Record<string, unknown>,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const appRedirect =
+      (req.query.app_redirect as string | undefined) ??
+      (body.app_redirect as string | undefined);
+
+    if (!appRedirect) {
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: 'Missing app_redirect',
+      });
+    }
+
+    const mergedParams: Record<string, unknown> = {
+      ...body,
+      ...(req.query as Record<string, unknown>),
+    };
+
+    const redirectUrl = this.appendParamsToRedirect(appRedirect, mergedParams);
+    return res.redirect(HttpStatus.FOUND, redirectUrl);
+  }
+
+  @Public()
+  @Get('kingschat/callback')
+  @HttpCode(HttpStatus.FOUND)
+  @ApiOperation({
+    summary: 'KingsChat OAuth GET callback intermediary',
+  })
+  kingsChatCallbackGet(@Req() req: Request, @Res() res: Response) {
+    const appRedirect = req.query.app_redirect as string | undefined;
+
+    if (!appRedirect) {
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: 'Missing app_redirect',
+      });
+    }
+
+    const redirectUrl = this.appendParamsToRedirect(
+      appRedirect,
+      req.query as Record<string, unknown>,
+    );
+    return res.redirect(HttpStatus.FOUND, redirectUrl);
+  }
 
   @Public()
   @Post('register')

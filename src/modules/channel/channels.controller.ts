@@ -5,6 +5,7 @@ import { ApiOkSuccessResponse } from '../../common/swagger';
 import { ChannelsService } from './channels.service';
 import {
   ChannelDetailsResponseDto,
+  ChannelLivestreamDto,
   ChannelProgramDto,
   ChannelVideosPaginatedDto,
 } from './dto';
@@ -47,6 +48,7 @@ export class ChannelsController {
   @ApiParam({ name: 'slug', description: 'Channel slug' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'programId', required: false, type: String })
   @ApiOkSuccessResponse({
     description: 'Channel videos retrieved successfully',
     model: ChannelVideosPaginatedDto,
@@ -55,11 +57,13 @@ export class ChannelsController {
     @Param('slug') slug: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('programId') programId?: string,
   ) {
     const data = await this.channelsService.getChannelVideosBySlug(
       slug,
       page,
       limit,
+      programId,
     );
 
     return {
@@ -94,6 +98,39 @@ export class ChannelsController {
     return {
       success: true,
       message: 'Channel programs retrieved successfully',
+      data,
+    };
+  }
+
+  @Public()
+  @Get(':slug/livestreams')
+  @ApiOperation({ summary: 'Get channel livestreams' })
+  @ApiParam({ name: 'slug', description: 'Channel slug' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['scheduled', 'live', 'ended', 'canceled'],
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiOkSuccessResponse({
+    description: 'Channel livestreams retrieved successfully',
+    model: ChannelLivestreamDto,
+    isArray: true,
+  })
+  async getChannelLivestreams(
+    @Param('slug') slug: string,
+    @Query('limit') limit?: number,
+    @Query('status') status?: string,
+  ) {
+    const data = await this.channelsService.getChannelLivestreamsBySlug(
+      slug,
+      limit,
+      status,
+    );
+
+    return {
+      success: true,
+      message: 'Channel livestreams retrieved successfully',
       data,
     };
   }

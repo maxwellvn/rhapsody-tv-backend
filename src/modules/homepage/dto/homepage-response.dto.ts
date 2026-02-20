@@ -15,6 +15,9 @@ export class HomepageChannelDto {
 
   @ApiPropertyOptional({ example: 'https://ik.imagekit.io/...' })
   coverImageUrl?: string;
+
+  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439011' })
+  defaultLiveStreamId?: string;
 }
 
 export class HomepageProgramDto {
@@ -27,6 +30,24 @@ export class HomepageProgramDto {
   @ApiPropertyOptional({ example: 'Start your day with us' })
   description?: string;
 
+  @ApiPropertyOptional({
+    enum: ['daily', 'weekly', 'once', 'continuous', 'scheduled'],
+    example: 'daily',
+  })
+  scheduleType?: string;
+
+  @ApiPropertyOptional({ example: '08:00' })
+  startTimeOfDay?: string;
+
+  @ApiPropertyOptional({ example: '09:00' })
+  endTimeOfDay?: string;
+
+  @ApiPropertyOptional({ type: [Number], example: [1, 3, 5] })
+  daysOfWeek?: number[];
+
+  @ApiPropertyOptional({ example: 'UTC' })
+  timezone?: string;
+
   @ApiProperty({ example: '2026-01-15T08:00:00.000Z' })
   startTime: string;
 
@@ -36,6 +57,12 @@ export class HomepageProgramDto {
   @ApiProperty({ example: false })
   isLive: boolean;
 
+  @ApiPropertyOptional({
+    enum: ['scheduled', 'live', 'ended', 'canceled'],
+    example: 'live',
+  })
+  status?: string;
+
   @ApiPropertyOptional({ type: HomepageChannelDto })
   channel?: HomepageChannelDto;
 
@@ -44,7 +71,24 @@ export class HomepageProgramDto {
 
   @ApiPropertyOptional({ example: '507f1f77bcf86cd799439011' })
   liveStreamId?: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/live/stream.m3u8' })
+  playbackUrl?: string;
+
+  @ApiPropertyOptional({ example: 'https://ik.imagekit.io/...' })
+  thumbnailUrl?: string;
+
+  @ApiPropertyOptional({ example: true })
+  isChatEnabled?: boolean;
+
+  @ApiPropertyOptional({ example: 'rtmp://example.com/live/key' })
+  rtmpUrl?: string;
+
+  @ApiPropertyOptional({ example: false })
+  isDefaultForChannel?: boolean;
 }
+
+export class HomepageLivestreamDto extends HomepageProgramDto {}
 
 export class HomepageVideoDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011' })

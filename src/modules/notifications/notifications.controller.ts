@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Query, Post } from '@nestjs/common';
+import { Controller, Delete, Get, Patch, Param, Query, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -107,6 +107,25 @@ export class NotificationsController {
     return {
       success: true,
       message: 'Notifications marked as read',
+    };
+  }
+
+  @Delete(':notificationId')
+  @ApiOperation({ summary: 'Delete a notification' })
+  @ApiParam({ name: 'notificationId', description: 'Notification ID' })
+  @ApiOkSuccessResponse({ description: 'Notification deleted' })
+  async deleteNotification(
+    @CurrentUser('sub') userId: string,
+    @Param('notificationId') notificationId: string,
+  ) {
+    await this.notificationModel.deleteOne({
+      _id: notificationId,
+      userId: new Types.ObjectId(userId),
+    });
+
+    return {
+      success: true,
+      message: 'Notification deleted',
     };
   }
 }

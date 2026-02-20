@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { Channel, ChannelDocument } from '../../channel/schemas/channel.schema';
 import {
   LiveStream,
   LiveStreamDocument,
+  LiveStreamScheduleType,
   LiveStreamStatus,
 } from '../../stream/schemas/live-stream.schema';
 import {
@@ -16,19 +18,62 @@ import { NotificationsService } from '../../notifications';
 @Injectable()
 export class AdminLivestreamsService {
   constructor(
+    @InjectModel(Channel.name)
+    private readonly channelModel: Model<ChannelDocument>,
     @InjectModel(LiveStream.name)
     private livestreamModel: Model<LiveStreamDocument>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(dto: CreateLivestreamDto): Promise<LiveStreamDocument> {
+    const scheduleType =
+      dto.scheduleType ?? LiveStreamScheduleType.SCHEDULED;
+
+    const scheduledStartAt = dto.scheduledStartAt
+      ? new Date(dto.scheduledStartAt)
+      : undefined;
+    const scheduledEndAt = dto.scheduledEndAt
+      ? new Date(dto.scheduledEndAt)
+      : undefined;
+
     const livestream = new this.livestreamModel({
-      ...dto,
       channelId: dto.channelId,
-      status: LiveStreamStatus.SCHEDULED,
+      programId: dto.programId,
+      title: dto.title,
+      description: dto.description,
+      scheduleType,
+      scheduledStartAt,
+      scheduledEndAt,
+      thumbnailUrl: dto.thumbnailUrl,
+      playbackUrl: dto.playbackUrl,
+      isChatEnabled: dto.isChatEnabled ?? true,
+      status:
+        scheduleType === LiveStreamScheduleType.CONTINUOUS
+          ? LiveStreamStatus.LIVE
+          : LiveStreamStatus.SCHEDULED,
+      startedAt:
+        scheduleType === LiveStreamScheduleType.CONTINUOUS
+          ? new Date()
+          : undefined,
     });
 
-    return livestream.save();
+    const saved = await livestream.save();
+
+    const channel = await this.channelModel
+      .findById(dto.channelId)
+      .select('_id defaultLiveStreamId');
+    if (
+      channel &&
+      (dto.setAsChannelDefault ||
+        (scheduleType === LiveStreamScheduleType.CONTINUOUS &&
+          !channel.defaultLiveStreamId))
+    ) {
+      await this.channelModel.findByIdAndUpdate(channel._id, {
+        defaultLiveStreamId: saved._id,
+      });
+    }
+
+    return saved;
   }
 
   async findAll(
@@ -46,7 +91,7 @@ export class AdminLivestreamsService {
         .find()
         .skip(skip)
         .limit(limit)
-        .populate('channelId', 'name slug')
+        .populate('channelId', 'name slug defaultLiveStreamId')
         .sort({ createdAt: -1 }),
       this.livestreamModel.countDocuments(),
     ]);
@@ -61,7 +106,7 @@ export class AdminLivestreamsService {
   async findById(id: string): Promise<LiveStreamDocument> {
     const livestream = await this.livestreamModel
       .findById(id)
-      .populate('channelId', 'name slug');
+      .populate('channelId', 'name slug defaultLiveStreamId');
 
     if (!livestream) {
       throw new NotFoundException('Livestream not found');
@@ -74,13 +119,47 @@ export class AdminLivestreamsService {
     id: string,
     dto: UpdateLivestreamDto,
   ): Promise<LiveStreamDocument> {
-    const livestream = await this.livestreamModel.findByIdAndUpdate(id, dto, {
-      new: true,
-      runValidators: true,
-    });
+    const updateData: Record<string, unknown> = { ...dto };
+    delete updateData.setAsChannelDefault;
+    if (dto.scheduledStartAt) {
+      updateData.scheduledStartAt = new Date(dto.scheduledStartAt);
+    }
+    if (dto.scheduledEndAt) {
+      updateData.scheduledEndAt = new Date(dto.scheduledEndAt);
+    }
+    if (dto.scheduleType === LiveStreamScheduleType.CONTINUOUS) {
+      updateData.status = LiveStreamStatus.LIVE;
+      updateData.startedAt = new Date();
+    }
+    if (dto.scheduleType === LiveStreamScheduleType.SCHEDULED) {
+      updateData.status = LiveStreamStatus.SCHEDULED;
+    }
+
+    const livestream = await this.livestreamModel.findByIdAndUpdate(
+      id,
+      updateData,
+      {
+        new: true,
+        runValidators: true,
+      },
+    );
 
     if (!livestream) {
       throw new NotFoundException('Livestream not found');
+    }
+
+    const channel = await this.channelModel
+      .findById(livestream.channelId)
+      .select('_id defaultLiveStreamId');
+    if (
+      channel &&
+      (dto.setAsChannelDefault ||
+        (dto.scheduleType === LiveStreamScheduleType.CONTINUOUS &&
+          !channel.defaultLiveStreamId))
+    ) {
+      await this.channelModel.findByIdAndUpdate(channel._id, {
+        defaultLiveStreamId: livestream._id,
+      });
     }
 
     return livestream;
@@ -133,5 +212,10 @@ export class AdminLivestreamsService {
     if (!result) {
       throw new NotFoundException('Livestream not found');
     }
+
+    await this.channelModel.updateMany(
+      { defaultLiveStreamId: result._id },
+      { $unset: { defaultLiveStreamId: 1 } },
+    );
   }
 }

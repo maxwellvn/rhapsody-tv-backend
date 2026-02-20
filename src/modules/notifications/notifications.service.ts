@@ -9,6 +9,9 @@ import {
   NotificationType,
 } from './schemas';
 import { Channel, ChannelDocument } from '../channel/schemas/channel.schema';
+import { Program, ProgramDocument } from '../channel/schemas/program.schema';
+import { Video, VideoDocument } from '../stream/schemas/video.schema';
+import { LiveStream, LiveStreamDocument } from '../stream/schemas/live-stream.schema';
 
 @Injectable()
 export class NotificationsService {
@@ -19,6 +22,12 @@ export class NotificationsService {
     private readonly subscriptionModel: Model<ChannelSubscriptionDocument>,
     @InjectModel(Channel.name)
     private readonly channelModel: Model<ChannelDocument>,
+    @InjectModel(Program.name)
+    private readonly programModel: Model<ProgramDocument>,
+    @InjectModel(Video.name)
+    private readonly videoModel: Model<VideoDocument>,
+    @InjectModel(LiveStream.name)
+    private readonly liveStreamModel: Model<LiveStreamDocument>,
   ) {}
 
   async createNotification(params: {
@@ -83,22 +92,48 @@ export class NotificationsService {
     return channel?.name || 'A channel you follow';
   }
 
+  async buildChannelContext(channelId: string): Promise<{
+    name: string;
+    slug?: string;
+    avatarUrl?: string;
+    coverImageUrl?: string;
+  }> {
+    const channel = await this.channelModel
+      .findById(channelId)
+      .select('name slug logoUrl coverImageUrl')
+      .lean();
+
+    return {
+      name: channel?.name || 'A channel you follow',
+      slug: channel?.slug,
+      avatarUrl: channel?.logoUrl,
+      coverImageUrl: channel?.coverImageUrl,
+    };
+  }
+
   async notifyNewVideo(params: {
     channelId: string;
     videoId: string;
     videoTitle: string;
   }) {
-    const channelName = await this.buildChannelTitle(params.channelId);
+    const channel = await this.buildChannelContext(params.channelId);
+    const video = await this.videoModel
+      .findById(params.videoId)
+      .select('thumbnailUrl')
+      .lean();
 
     return this.notifyChannelSubscribers({
       channelId: params.channelId,
       type: NotificationType.CHANNEL_NEW_VIDEO,
       preferenceKey: 'notifyOnNewVideo',
-      title: `${channelName} uploaded a new video`,
+      title: `${channel.name} uploaded a new video`,
       body: params.videoTitle,
       data: {
         channelId: params.channelId,
+        channelSlug: channel.slug,
         videoId: params.videoId,
+        avatarUrl: channel.avatarUrl,
+        thumbnailUrl: video?.thumbnailUrl || channel.coverImageUrl,
       },
     });
   }
@@ -108,17 +143,24 @@ export class NotificationsService {
     livestreamId: string;
     livestreamTitle: string;
   }) {
-    const channelName = await this.buildChannelTitle(params.channelId);
+    const channel = await this.buildChannelContext(params.channelId);
+    const livestream = await this.liveStreamModel
+      .findById(params.livestreamId)
+      .select('thumbnailUrl')
+      .lean();
 
     return this.notifyChannelSubscribers({
       channelId: params.channelId,
       type: NotificationType.CHANNEL_GO_LIVE,
       preferenceKey: 'notifyOnGoLive',
-      title: `${channelName} is live now`,
+      title: `${channel.name} is live now`,
       body: params.livestreamTitle,
       data: {
         channelId: params.channelId,
+        channelSlug: channel.slug,
         livestreamId: params.livestreamId,
+        avatarUrl: channel.avatarUrl,
+        thumbnailUrl: livestream?.thumbnailUrl || channel.coverImageUrl,
       },
     });
   }
@@ -129,17 +171,24 @@ export class NotificationsService {
     programTitle: string;
     startTime: string;
   }) {
-    const channelName = await this.buildChannelTitle(params.channelId);
+    const channel = await this.buildChannelContext(params.channelId);
+    const program = await this.programModel
+      .findById(params.programId)
+      .select('thumbnailUrl')
+      .lean();
 
     return this.notifyChannelSubscribers({
       channelId: params.channelId,
       type: NotificationType.CHANNEL_NEW_PROGRAM,
       preferenceKey: 'notifyOnNewProgram',
-      title: `${channelName} scheduled a program`,
+      title: `${channel.name} scheduled a program`,
       body: `${params.programTitle} • ${params.startTime}`,
       data: {
         channelId: params.channelId,
+        channelSlug: channel.slug,
         programId: params.programId,
+        avatarUrl: channel.avatarUrl,
+        thumbnailUrl: program?.thumbnailUrl || channel.coverImageUrl,
       },
     });
   }
@@ -192,5 +241,29 @@ export class NotificationsService {
     });
 
     return { skipped: false };
+  }
+
+  async notifyAnnouncement(params: {
+    title: string;
+    body: string;
+    userIds: string[];
+    data?: Record<string, unknown>;
+  }) {
+    if (params.userIds.length === 0) {
+      return { count: 0 };
+    }
+
+    await this.notificationModel.insertMany(
+      params.userIds.map((userId) => ({
+        userId: new Types.ObjectId(userId),
+        type: NotificationType.ANNOUNCEMENT,
+        title: params.title,
+        body: params.body,
+        data: params.data,
+        isRead: false,
+      })),
+    );
+
+    return { count: params.userIds.length };
   }
 }

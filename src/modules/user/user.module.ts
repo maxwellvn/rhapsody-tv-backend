@@ -8,10 +8,12 @@ import { Video, VideoSchema } from '../stream/schemas/video.schema';
 import { WatchlistService } from './watchlist.service';
 import { WatchHistoryService } from './watch-history.service';
 import { StreamModule } from '../stream';
+import { ImageKitModule } from '../../shared/services/imagekit';
 
 @Module({
   imports: [
     StreamModule,
+    ImageKitModule,
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: Watchlist.name, schema: WatchlistSchema },
