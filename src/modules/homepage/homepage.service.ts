@@ -19,6 +19,9 @@ import type {
   HomepageProgramDto,
   HomepageVideoDto,
   HomepageContinueWatchingDto,
+  SearchChannelResultDto,
+  SearchProgramResultDto,
+  UnifiedSearchResultsDto,
 } from './dto';
 
 @Injectable()
@@ -421,5 +424,247 @@ export class HomepageService {
     }
 
     return this.toLivestreamProgramDto(livestream, isDefaultForChannel);
+  }
+
+  // ─── Unified Semantic Search ──────────────────────────────────────────────
+
+  private readonly searchSynonyms: Record<string, string[]> = {
+    live: ['stream', 'broadcast', 'now', 'realtime'],
+    stream: ['live', 'broadcast'],
+    worship: ['praise', 'church', 'service', 'sermon'],
+    sermon: ['message', 'teaching', 'preaching', 'worship'],
+    music: ['song', 'audio', 'concert', 'worship'],
+    prayer: ['devotion', 'intercession', 'worship'],
+    motivation: ['inspiration', 'encouragement'],
+    podcast: ['talk', 'discussion', 'conversation'],
+  };
+
+  private searchTokenize(text?: string): string[] {
+    if (!text) return [];
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .map((t) => t.trim())
+      .filter((t) => t.length >= 2);
+  }
+
+  private searchNormalize(text?: string): string {
+    if (!text) return '';
+    return text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  private searchBuildTerms(query: string): string[] {
+    const terms = new Set<string>();
+    const tokens = this.searchTokenize(query);
+    for (const token of tokens) {
+      terms.add(token);
+      (this.searchSynonyms[token] ?? []).forEach((s) => terms.add(s));
+    }
+    if (query.trim()) terms.add(this.searchNormalize(query));
+    return Array.from(terms);
+  }
+
+  private searchDice(a: string, b: string): number {
+    if (!a || !b) return 0;
+    if (a === b) return 1;
+    if (a.length < 2 || b.length < 2) return 0;
+    const bigrams = new Map<string, number>();
+    for (let i = 0; i < a.length - 1; i++) {
+      const bg = a.slice(i, i + 2);
+      bigrams.set(bg, (bigrams.get(bg) ?? 0) + 1);
+    }
+    let overlap = 0;
+    for (let i = 0; i < b.length - 1; i++) {
+      const bg = b.slice(i, i + 2);
+      const count = bigrams.get(bg) ?? 0;
+      if (count > 0) { overlap++; bigrams.set(bg, count - 1); }
+    }
+    return (2 * overlap) / (a.length + b.length - 2);
+  }
+
+  private scoreVideo(video: VideoDocument & { channelId?: { name?: string } }, query: string): number {
+    const q = this.searchNormalize(query);
+    if (!q) return 0;
+    const title = this.searchNormalize(video.title);
+    const desc = this.searchNormalize(video.description);
+    const channel = this.searchNormalize((video.channelId as any)?.name);
+    const hay = `${title} ${desc} ${channel}`.trim();
+    const tokens = this.searchTokenize(q);
+    const terms = this.searchBuildTerms(q);
+    let score = 0;
+    if (title.includes(q)) score += 130;
+    if (desc.includes(q)) score += 90;
+    if (hay.includes(q)) score += 70;
+    for (const t of tokens) {
+      if (title.includes(t)) score += 35;
+      else if (hay.includes(t)) score += 20;
+    }
+    for (const t of terms) {
+      if (t.length < 3) continue;
+      if (title.includes(t)) score += 16;
+      else if (hay.includes(t)) score += 8;
+    }
+    score += this.searchDice(q, title) * 90;
+    score += this.searchDice(q, hay) * 45;
+    score += Math.log1p((video as any).viewCount ?? 0) * 2;
+    score += Math.log1p((video as any).likeCount ?? 0) * 2;
+    return score;
+  }
+
+  private scoreChannel(channel: ChannelDocument, query: string): number {
+    const q = this.searchNormalize(query);
+    if (!q) return 0;
+    const name = this.searchNormalize(channel.name);
+    const slug = this.searchNormalize(channel.slug);
+    const desc = this.searchNormalize(channel.description);
+    const hay = `${name} ${slug} ${desc}`.trim();
+    const tokens = this.searchTokenize(q);
+    const terms = this.searchBuildTerms(q);
+    let score = 0;
+    if (name.includes(q)) score += 130;
+    if (slug.includes(q)) score += 80;
+    if (desc.includes(q)) score += 60;
+    for (const t of tokens) {
+      if (name.includes(t)) score += 40;
+      else if (hay.includes(t)) score += 20;
+    }
+    for (const t of terms) {
+      if (t.length < 3) continue;
+      if (name.includes(t)) score += 18;
+      else if (hay.includes(t)) score += 8;
+    }
+    score += this.searchDice(q, name) * 90;
+    score += this.searchDice(q, hay) * 40;
+    score += Math.log1p(channel.subscriberCount ?? 0) * 2;
+    return score;
+  }
+
+  private scoreProgram(program: ProgramDocument & { channelId?: { name?: string } }, query: string): number {
+    const q = this.searchNormalize(query);
+    if (!q) return 0;
+    const title = this.searchNormalize(program.title);
+    const desc = this.searchNormalize(program.description);
+    const channelName = this.searchNormalize((program.channelId as any)?.name);
+    const hay = `${title} ${desc} ${channelName}`.trim();
+    const tokens = this.searchTokenize(q);
+    const terms = this.searchBuildTerms(q);
+    let score = 0;
+    if (title.includes(q)) score += 130;
+    if (desc.includes(q)) score += 80;
+    if (channelName.includes(q)) score += 50;
+    for (const t of tokens) {
+      if (title.includes(t)) score += 40;
+      else if (hay.includes(t)) score += 20;
+    }
+    for (const t of terms) {
+      if (t.length < 3) continue;
+      if (title.includes(t)) score += 18;
+      else if (hay.includes(t)) score += 8;
+    }
+    score += this.searchDice(q, title) * 90;
+    score += this.searchDice(q, hay) * 40;
+    if ((program as any).isLive) score += 20;
+    return score;
+  }
+
+  async search(query: string, limit = 5): Promise<UnifiedSearchResultsDto> {
+    const safeLimit = Math.min(Math.max(limit, 1), 50);
+    const q = query.trim();
+
+    if (!q) {
+      return { videos: [], channels: [], programs: [], totals: { videos: 0, channels: 0, programs: 0 } };
+    }
+
+    const terms = this.searchBuildTerms(q).slice(0, 10);
+    const termRegexes = terms
+      .filter((t) => t.length >= 2)
+      .map((t) => new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+
+    const videoFilter = termRegexes.length
+      ? { isActive: true, visibility: VideoVisibility.PUBLIC, $or: termRegexes.flatMap((r) => [{ title: r }, { description: r }]) }
+      : { isActive: true, visibility: VideoVisibility.PUBLIC };
+
+    const channelFilter = termRegexes.length
+      ? { isActive: true, $or: termRegexes.flatMap((r) => [{ name: r }, { slug: r }, { description: r }]) }
+      : { isActive: true };
+
+    const programFilter = termRegexes.length
+      ? { isActive: true, $or: termRegexes.flatMap((r) => [{ title: r }, { description: r }]) }
+      : { isActive: true };
+
+    const [rawVideos, rawChannels, rawPrograms] = await Promise.all([
+      this.videoModel
+        .find(videoFilter)
+        .limit(300)
+        .populate('channelId', 'name slug logoUrl coverImageUrl')
+        .sort({ publishedAt: -1, createdAt: -1 })
+        .exec(),
+      this.channelModel
+        .find(channelFilter)
+        .limit(100)
+        .sort({ subscriberCount: -1, createdAt: -1 })
+        .exec(),
+      this.programModel
+        .find(programFilter)
+        .limit(200)
+        .populate('channelId', 'name slug logoUrl coverImageUrl')
+        .sort({ isLive: -1, startTime: 1 })
+        .exec(),
+    ]);
+
+    const scoredVideos = rawVideos
+      .map((v) => ({ v, score: this.scoreVideo(v as any, q) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    const scoredChannels = rawChannels
+      .map((c) => ({ c, score: this.scoreChannel(c, q) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    const scoredPrograms = rawPrograms
+      .map((p) => ({ p, score: this.scoreProgram(p as any, q) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    const videos = scoredVideos.slice(0, safeLimit).map(({ v }) => this.toVideoDto(v));
+
+    const channels: SearchChannelResultDto[] = scoredChannels.slice(0, safeLimit).map(({ c }) => ({
+      id: c._id.toString(),
+      name: c.name,
+      slug: c.slug,
+      description: c.description,
+      logoUrl: c.logoUrl,
+      coverImageUrl: c.coverImageUrl,
+      defaultLiveStreamId: c.defaultLiveStreamId?.toString(),
+      subscriberCount: c.subscriberCount ?? 0,
+    }));
+
+    const programs: SearchProgramResultDto[] = scoredPrograms.slice(0, safeLimit).map(({ p }) => {
+      const ch = this.resolvePopulatedChannel((p as any).channelId);
+      return {
+        id: p._id.toString(),
+        title: p.title,
+        description: p.description,
+        scheduleType: p.scheduleType,
+        startTime: p.startTime.toISOString(),
+        endTime: p.endTime.toISOString(),
+        isLive: !!(p as any).isLive,
+        thumbnailUrl: (p as any).thumbnailUrl,
+        channel: ch ? this.toChannelDto(ch) : undefined,
+      };
+    });
+
+    return {
+      videos,
+      channels,
+      programs,
+      totals: {
+        videos: scoredVideos.length,
+        channels: scoredChannels.length,
+        programs: scoredPrograms.length,
+      },
+    };
   }
 }

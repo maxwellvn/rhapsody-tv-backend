@@ -130,6 +130,86 @@ export class HomepageContinueWatchingDto {
   durationSeconds: number;
 }
 
+export class SearchChannelResultDto {
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  id: string;
+
+  @ApiProperty({ example: 'Rhapsody TV' })
+  name: string;
+
+  @ApiProperty({ example: 'rhapsody-tv' })
+  slug: string;
+
+  @ApiPropertyOptional({ example: 'A channel description' })
+  description?: string;
+
+  @ApiPropertyOptional({ example: 'https://ik.imagekit.io/...' })
+  logoUrl?: string;
+
+  @ApiPropertyOptional({ example: 'https://ik.imagekit.io/...' })
+  coverImageUrl?: string;
+
+  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439011' })
+  defaultLiveStreamId?: string;
+
+  @ApiProperty({ example: 1200 })
+  subscriberCount: number;
+}
+
+export class SearchProgramResultDto {
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  id: string;
+
+  @ApiProperty({ example: 'Morning Devotion' })
+  title: string;
+
+  @ApiPropertyOptional({ example: 'Daily morning inspiration' })
+  description?: string;
+
+  @ApiPropertyOptional({ example: 'daily' })
+  scheduleType?: string;
+
+  @ApiProperty({ example: '2026-01-15T08:00:00.000Z' })
+  startTime: string;
+
+  @ApiProperty({ example: '2026-01-15T09:00:00.000Z' })
+  endTime: string;
+
+  @ApiProperty({ example: false })
+  isLive: boolean;
+
+  @ApiPropertyOptional({ example: 'https://ik.imagekit.io/...' })
+  thumbnailUrl?: string;
+
+  @ApiPropertyOptional({ type: HomepageChannelDto })
+  channel?: HomepageChannelDto;
+}
+
+export class UnifiedSearchTotalsDto {
+  @ApiProperty({ example: 12 })
+  videos: number;
+
+  @ApiProperty({ example: 3 })
+  channels: number;
+
+  @ApiProperty({ example: 7 })
+  programs: number;
+}
+
+export class UnifiedSearchResultsDto {
+  @ApiProperty({ type: [HomepageVideoDto] })
+  videos: HomepageVideoDto[];
+
+  @ApiProperty({ type: [SearchChannelResultDto] })
+  channels: SearchChannelResultDto[];
+
+  @ApiProperty({ type: [SearchProgramResultDto] })
+  programs: SearchProgramResultDto[];
+
+  @ApiProperty({ type: UnifiedSearchTotalsDto })
+  totals: UnifiedSearchTotalsDto;
+}
+
 export class HomepageResponseDto {
   @ApiPropertyOptional({ type: HomepageProgramDto })
   liveNow?: HomepageProgramDto;

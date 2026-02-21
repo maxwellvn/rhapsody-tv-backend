@@ -16,6 +16,7 @@ import {
   HomepageProgramDto,
   HomepageVideoDto,
   HomepageContinueWatchingDto,
+  UnifiedSearchResultsDto,
   UpdateProgressDto,
 } from './dto';
 
@@ -190,6 +191,27 @@ export class HomepageController {
         progressSeconds: record.progressSeconds,
         durationSeconds: record.durationSeconds,
       },
+    };
+  }
+
+  @Public()
+  @Get('search')
+  @ApiOperation({ summary: 'Unified semantic search across videos, channels, and programs' })
+  @ApiQuery({ name: 'q', required: true, type: String, description: 'Search query' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Max results per type (default 5, max 50)' })
+  @ApiOkSuccessResponse({
+    description: 'Search results retrieved successfully',
+    model: UnifiedSearchResultsDto,
+  })
+  async search(
+    @Query('q') q: string,
+    @Query('limit') limit?: number,
+  ): Promise<{ success: boolean; message: string; data: UnifiedSearchResultsDto }> {
+    const data = await this.homepageService.search(q ?? '', limit ? Number(limit) : 5);
+    return {
+      success: true,
+      message: 'Search results retrieved successfully',
+      data,
     };
   }
 
