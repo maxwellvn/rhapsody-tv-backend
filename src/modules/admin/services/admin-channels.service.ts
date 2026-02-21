@@ -65,7 +65,7 @@ export class AdminChannelsService {
     const skip = (page - 1) * limit;
 
     const [channels, total] = await Promise.all([
-      this.channelModel.find().skip(skip).limit(limit).sort({ createdAt: -1 }),
+      this.channelModel.find().skip(skip).limit(limit).sort({ displayOrder: 1, createdAt: -1 }),
       this.channelModel.countDocuments(),
     ]);
 
@@ -98,6 +98,19 @@ export class AdminChannelsService {
     }
 
     return channel;
+  }
+
+  async updateDisplayOrder(
+    orders: { id: string; displayOrder: number }[],
+  ): Promise<void> {
+    const bulkOps = orders.map(({ id, displayOrder }) => ({
+      updateOne: {
+        filter: { _id: id },
+        update: { $set: { displayOrder } },
+      },
+    }));
+
+    await this.channelModel.bulkWrite(bulkOps);
   }
 
   async remove(id: string): Promise<void> {

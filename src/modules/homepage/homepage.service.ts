@@ -259,10 +259,15 @@ export class HomepageService {
   async getChannels(limit = 10): Promise<HomepageChannelDto[]> {
     const safeLimit = Math.min(Math.max(limit, 1), 50);
     const channels = await this.channelModel.find({ isActive: true }).sort({
+      displayOrder: 1,
       createdAt: -1,
     });
 
-    const defaultLiveStreamIds = channels
+    // Split into channels with explicit displayOrder and those without
+    const ordered = channels.filter((c) => c.displayOrder != null);
+    const unordered = channels.filter((c) => c.displayOrder == null);
+
+    const defaultLiveStreamIds = unordered
       .map((channel) => channel.defaultLiveStreamId?.toString())
       .filter((id): id is string => !!id);
 
@@ -282,7 +287,8 @@ export class HomepageService {
       });
     }
 
-    const sorted = [...channels].sort((a, b) => {
+    // Unordered channels keep existing priority logic
+    const sortedUnordered = [...unordered].sort((a, b) => {
       const aIsPrimary = a.slug === this.PRIMARY_HOME_CHANNEL_SLUG;
       const bIsPrimary = b.slug === this.PRIMARY_HOME_CHANNEL_SLUG;
 
@@ -319,7 +325,10 @@ export class HomepageService {
       );
     });
 
-    return sorted.slice(0, safeLimit).map((c) => this.toChannelDto(c));
+    // Ordered channels first (already sorted by displayOrder from DB), then unordered
+    const combined = [...ordered, ...sortedUnordered];
+
+    return combined.slice(0, safeLimit).map((c) => this.toChannelDto(c));
   }
 
   async getPrograms(limit = 10): Promise<HomepageProgramDto[]> {

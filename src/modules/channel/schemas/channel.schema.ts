@@ -34,6 +34,9 @@ export class Channel {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  @Prop({ type: Number, min: 0, max: 1000 })
+  displayOrder?: number;
 }
 
 export const ChannelSchema = SchemaFactory.createForClass(Channel);
@@ -42,6 +45,7 @@ export const ChannelSchema = SchemaFactory.createForClass(Channel);
 ChannelSchema.index({ slug: 1 }, { unique: true });
 ChannelSchema.index({ isActive: 1 });
 ChannelSchema.index({ createdAt: -1 });
+ChannelSchema.index({ isActive: 1, displayOrder: 1 });
 
 // Ensure __v is removed
 ChannelSchema.set('toJSON', {

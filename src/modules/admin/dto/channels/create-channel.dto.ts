@@ -2,6 +2,9 @@ import {
   IsString,
   IsOptional,
   IsBoolean,
+  IsInt,
+  Min,
+  Max,
   MinLength,
   MaxLength,
 } from 'class-validator';
@@ -48,4 +51,11 @@ export class CreateChannelDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({ example: 1, description: 'Display order on homepage (0-1000)' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  displayOrder?: number;
 }

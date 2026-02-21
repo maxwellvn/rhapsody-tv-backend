@@ -16,7 +16,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { AdminChannelsService } from '../services/admin-channels.service';
-import { CreateChannelDto, UpdateChannelDto } from '../dto/channels';
+import { CreateChannelDto, UpdateChannelDto, ReorderChannelsDto } from '../dto/channels';
 import { ChannelResponseDto, PaginatedChannelsResponseDto } from '../dto';
 import { Roles } from '../../../common/decorators';
 import { Role } from '../../../shared/enums/role.enum';
@@ -66,6 +66,18 @@ export class AdminChannelsController {
       success: true,
       message: 'Channels retrieved successfully',
       data: result,
+    };
+  }
+
+  @Patch('reorder')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Reorder channels (Admin only)' })
+  @ApiOkSuccessResponse({ description: 'Channels reordered successfully' })
+  async reorder(@Body() dto: ReorderChannelsDto) {
+    await this.adminChannelsService.updateDisplayOrder(dto.orders);
+    return {
+      success: true,
+      message: 'Channels reordered successfully',
     };
   }
 
