@@ -16,6 +16,7 @@ import { NotificationsModule } from './modules/notifications';
 import { StreamModule } from './modules/stream';
 import { AdminModule } from './modules/admin/admin.module';
 import { MailModule } from './modules/mail/mail.module';
+import { VideosModule } from './modules/videos';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -127,6 +128,9 @@ async function bootstrap() {
     );
     setupModuleDocs('vod', 'Rhapsody TV API - VOD', 'VOD endpoints', [
       VodModule,
+    ]);
+    setupModuleDocs('videos', 'Rhapsody TV API - Videos', 'Video endpoints', [
+      VideosModule,
     ]);
     setupModuleDocs(
       'notifications',

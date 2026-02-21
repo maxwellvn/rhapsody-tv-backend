@@ -30,6 +30,7 @@ import { VodModule } from './modules/vod';
 import { ChannelModule } from './modules/channel';
 import { NotificationsModule } from './modules/notifications';
 import { MailModule } from './modules/mail/mail.module';
+import { VideosModule } from './modules/videos';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { MailModule } from './modules/mail/mail.module';
     ChannelModule,
     NotificationsModule,
     HomepageModule,
+    VideosModule,
     VodModule,
     MailModule,
   ],
