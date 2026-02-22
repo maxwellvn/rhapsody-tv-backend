@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Channel, ChannelDocument } from '../channel/schemas/channel.schema';
 import { Program, ProgramDocument } from '../channel/schemas/program.schema';
 import {
@@ -341,6 +341,8 @@ export class HomepageService {
       .limit(safeLimit);
 
     const programIds = programs.map((p) => p._id);
+
+    // Count videos linked via video.programId
     const videoCounts = await this.videoModel.aggregate([
       {
         $match: {
@@ -353,6 +355,38 @@ export class HomepageService {
     const countMap = new Map<string, number>(
       videoCounts.map((v) => [v._id.toString(), v.count]),
     );
+
+    // For programs that have a direct videoId but no videos counted via video.programId,
+    // check if the linked video exists and is public
+    const programsWithDirectVideo = programs.filter(
+      (p) => p.videoId && !countMap.has(p._id.toString()),
+    );
+
+    if (programsWithDirectVideo.length > 0) {
+      const directVideoIds = programsWithDirectVideo
+        .map((p) => p.videoId)
+        .filter((id): id is Types.ObjectId => !!id);
+      const existingVideos = await this.videoModel
+        .find({
+          _id: { $in: directVideoIds },
+          visibility: VideoVisibility.PUBLIC,
+        })
+        .select('_id')
+        .lean();
+
+      const existingVideoIdSet = new Set(
+        existingVideos.map((v) => v._id.toString()),
+      );
+
+      for (const program of programsWithDirectVideo) {
+        if (
+          program.videoId &&
+          existingVideoIdSet.has(program.videoId.toString())
+        ) {
+          countMap.set(program._id.toString(), 1);
+        }
+      }
+    }
 
     return programs.map((p) => ({
       ...this.toProgramDto(p),
