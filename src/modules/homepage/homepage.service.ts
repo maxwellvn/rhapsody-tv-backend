@@ -340,13 +340,31 @@ export class HomepageService {
       .sort({ isLive: -1, createdAt: -1, startTime: 1 })
       .limit(safeLimit);
 
-    const programIds = programs.map((p) => p._id);
+    // Build ID candidates matching both string and ObjectId forms (MongoDB may store either)
+    const programIdCandidates = programs.flatMap((p) => {
+      const id = p._id;
+      const candidates: Array<string | Types.ObjectId> = [];
+      if (id instanceof Types.ObjectId) candidates.push(id);
+      const strId = String(id);
+      candidates.push(strId);
+      if (
+        typeof strId === 'string' &&
+        strId.length === 24 &&
+        /^[0-9a-fA-F]{24}$/.test(strId)
+      ) {
+        const objId = new Types.ObjectId(strId);
+        if (!candidates.some((c) => c instanceof Types.ObjectId && c.equals(objId))) {
+          candidates.push(objId);
+        }
+      }
+      return candidates;
+    });
 
-    // Count videos linked via video.programId
+    // Count videos linked via video.programId (match both string and ObjectId)
     const videoCounts = await this.videoModel.aggregate([
       {
         $match: {
-          programId: { $in: programIds },
+          programId: { $in: programIdCandidates },
           visibility: VideoVisibility.PUBLIC,
         },
       },
