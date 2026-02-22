@@ -119,20 +119,34 @@ export class NotificationsService {
     const channel = await this.buildChannelContext(params.channelId);
     const video = await this.videoModel
       .findById(params.videoId)
-      .select('thumbnailUrl')
+      .select('thumbnailUrl programId')
       .lean();
+
+    // If video belongs to a program, use the program name instead of the channel name
+    let sourceName = channel.name;
+    let sourceAvatarUrl = channel.avatarUrl;
+    if (video?.programId) {
+      const program = await this.programModel
+        .findById(video.programId)
+        .select('title thumbnailUrl')
+        .lean();
+      if (program?.title) {
+        sourceName = program.title;
+        sourceAvatarUrl = program.thumbnailUrl || channel.avatarUrl;
+      }
+    }
 
     return this.notifyChannelSubscribers({
       channelId: params.channelId,
       type: NotificationType.CHANNEL_NEW_VIDEO,
       preferenceKey: 'notifyOnNewVideo',
-      title: `${channel.name} uploaded a new video`,
+      title: `${sourceName} uploaded a new video`,
       body: params.videoTitle,
       data: {
         channelId: params.channelId,
         channelSlug: channel.slug,
         videoId: params.videoId,
-        avatarUrl: channel.avatarUrl,
+        avatarUrl: sourceAvatarUrl,
         thumbnailUrl: video?.thumbnailUrl || channel.coverImageUrl,
       },
     });
@@ -146,20 +160,34 @@ export class NotificationsService {
     const channel = await this.buildChannelContext(params.channelId);
     const livestream = await this.liveStreamModel
       .findById(params.livestreamId)
-      .select('thumbnailUrl')
+      .select('thumbnailUrl programId')
       .lean();
+
+    // If livestream belongs to a program, use the program name
+    let sourceName = channel.name;
+    let sourceAvatarUrl = channel.avatarUrl;
+    if (livestream?.programId) {
+      const program = await this.programModel
+        .findById(livestream.programId)
+        .select('title thumbnailUrl')
+        .lean();
+      if (program?.title) {
+        sourceName = program.title;
+        sourceAvatarUrl = program.thumbnailUrl || channel.avatarUrl;
+      }
+    }
 
     return this.notifyChannelSubscribers({
       channelId: params.channelId,
       type: NotificationType.CHANNEL_GO_LIVE,
       preferenceKey: 'notifyOnGoLive',
-      title: `${channel.name} is live now`,
+      title: `${sourceName} is live now`,
       body: params.livestreamTitle,
       data: {
         channelId: params.channelId,
         channelSlug: channel.slug,
         livestreamId: params.livestreamId,
-        avatarUrl: channel.avatarUrl,
+        avatarUrl: sourceAvatarUrl,
         thumbnailUrl: livestream?.thumbnailUrl || channel.coverImageUrl,
       },
     });
@@ -181,13 +209,13 @@ export class NotificationsService {
       channelId: params.channelId,
       type: NotificationType.CHANNEL_NEW_PROGRAM,
       preferenceKey: 'notifyOnNewProgram',
-      title: `${channel.name} scheduled a program`,
+      title: `New program on ${channel.name}`,
       body: `${params.programTitle} • ${params.startTime}`,
       data: {
         channelId: params.channelId,
         channelSlug: channel.slug,
         programId: params.programId,
-        avatarUrl: channel.avatarUrl,
+        avatarUrl: program?.thumbnailUrl || channel.avatarUrl,
         thumbnailUrl: program?.thumbnailUrl || channel.coverImageUrl,
       },
     });
