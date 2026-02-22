@@ -174,6 +174,7 @@ export class HomepageService {
         : undefined,
       videoId: program.videoId?.toString(),
       liveStreamId: program.liveStreamId?.toString(),
+      thumbnailUrl: program.thumbnailUrl,
     };
   }
 
@@ -339,7 +340,24 @@ export class HomepageService {
       .sort({ isLive: -1, createdAt: -1, startTime: 1 })
       .limit(safeLimit);
 
-    return programs.map((p) => this.toProgramDto(p));
+    const programIds = programs.map((p) => p._id);
+    const videoCounts = await this.videoModel.aggregate([
+      {
+        $match: {
+          programId: { $in: programIds },
+          visibility: VideoVisibility.PUBLIC,
+        },
+      },
+      { $group: { _id: '$programId', count: { $sum: 1 } } },
+    ]);
+    const countMap = new Map<string, number>(
+      videoCounts.map((v) => [v._id.toString(), v.count]),
+    );
+
+    return programs.map((p) => ({
+      ...this.toProgramDto(p),
+      videoCount: countMap.get(p._id.toString()) ?? 0,
+    }));
   }
 
   async getFeaturedVideos(limit = 10): Promise<HomepageVideoDto[]> {

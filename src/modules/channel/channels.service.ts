@@ -201,6 +201,7 @@ export class ChannelsService {
       bookmarkCount: program.bookmarkCount || 0,
       videoId: program.videoId?.toString(),
       liveStreamId: program.liveStreamId?.toString() || fallbackLiveStreamId,
+      thumbnailUrl: program.thumbnailUrl,
     };
   }
 

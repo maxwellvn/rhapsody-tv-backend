@@ -115,6 +115,9 @@ export class ChannelProgramDto {
 
   @ApiPropertyOptional({ example: '507f1f77bcf86cd799439011' })
   liveStreamId?: string;
+
+  @ApiPropertyOptional({ example: 'https://ik.imagekit.io/thumbnail.jpg' })
+  thumbnailUrl?: string;
 }
 
 export class ChannelLivestreamDto {

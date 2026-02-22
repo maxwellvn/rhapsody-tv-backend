@@ -86,6 +86,9 @@ export class HomepageProgramDto {
 
   @ApiPropertyOptional({ example: false })
   isDefaultForChannel?: boolean;
+
+  @ApiPropertyOptional({ example: 5 })
+  videoCount?: number;
 }
 
 export class HomepageLivestreamDto extends HomepageProgramDto {}
