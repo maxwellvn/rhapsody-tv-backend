@@ -177,8 +177,9 @@ export class ChannelsService {
   private toProgramDto(
     program: ProgramDocument,
     fallbackLiveStreamId?: string,
+    referenceDate?: Date,
   ): ChannelProgramDto {
-    const window = this.resolveProgramWindow(program) ?? {
+    const window = this.resolveProgramWindow(program, referenceDate) ?? {
       startTime: new Date(program.startTime),
       endTime: new Date(program.endTime),
     };
@@ -479,7 +480,8 @@ export class ChannelsService {
     const defaultLiveStreamId =
       await this.resolveChannelDefaultLiveStreamId(channel);
 
-    return programs.map((p) => this.toProgramDto(p, defaultLiveStreamId));
+    const refDate = date ? new Date(date) : undefined;
+    return programs.map((p) => this.toProgramDto(p, defaultLiveStreamId, refDate));
   }
 
   async getChannelLivestreamsBySlug(
