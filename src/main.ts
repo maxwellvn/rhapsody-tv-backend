@@ -17,10 +17,13 @@ import { StreamModule } from './modules/stream';
 import { AdminModule } from './modules/admin/admin.module';
 import { MailModule } from './modules/mail/mail.module';
 import { VideosModule } from './modules/videos';
+import { DonationsModule } from './modules/donations';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port', 3000);
@@ -150,6 +153,12 @@ async function bootstrap() {
     setupModuleDocs('mail', 'Rhapsody TV API - Mail', 'Mail endpoints', [
       MailModule,
     ]);
+    setupModuleDocs(
+      'donations',
+      'Rhapsody TV API - Donations',
+      'Donation endpoints',
+      [DonationsModule],
+    );
 
     logger.log(
       `Swagger documentation available at http://localhost:${port}/v1/docs`,

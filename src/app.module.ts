@@ -11,6 +11,7 @@ import {
   jwtConfig,
   imagekitConfig,
   kingschatConfig,
+  stripeConfig,
 } from './config';
 
 // Common
@@ -31,6 +32,7 @@ import { ChannelModule } from './modules/channel';
 import { NotificationsModule } from './modules/notifications';
 import { MailModule } from './modules/mail/mail.module';
 import { VideosModule } from './modules/videos';
+import { DonationsModule } from './modules/donations';
 
 @Module({
   imports: [
@@ -44,6 +46,7 @@ import { VideosModule } from './modules/videos';
         jwtConfig,
         imagekitConfig,
         kingschatConfig,
+        stripeConfig,
       ],
       envFilePath: ['.env', '.env.local'],
     }),
@@ -71,6 +74,7 @@ import { VideosModule } from './modules/videos';
     VideosModule,
     VodModule,
     MailModule,
+    DonationsModule,
   ],
   providers: [
     // Global Exception Filter
