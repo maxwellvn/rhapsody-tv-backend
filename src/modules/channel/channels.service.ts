@@ -170,7 +170,9 @@ export class ChannelsService {
       viewCount: video.viewCount || 0,
       publishedAt: video.publishedAt
         ? video.publishedAt.toISOString()
-        : undefined,
+        : (video as VideoDocument & { createdAt?: Date }).createdAt
+          ? (video as VideoDocument & { createdAt?: Date }).createdAt!.toISOString()
+          : undefined,
     };
   }
 
