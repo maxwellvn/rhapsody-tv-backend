@@ -21,7 +21,7 @@ import { CreateEspeesDonationDto } from './dto/create-espees-donation.dto';
 @Injectable()
 export class DonationsService {
   private readonly logger = new Logger(DonationsService.name);
-  private readonly stripe: Stripe;
+  private stripe: Stripe | null = null;
 
   constructor(
     @InjectModel(Donation.name)
@@ -29,7 +29,22 @@ export class DonationsService {
     @Inject(stripeConfig.KEY)
     private readonly config: ConfigType<typeof stripeConfig>,
   ) {
-    this.stripe = new Stripe(this.config.secretKey);
+    if (this.config.secretKey) {
+      this.stripe = new Stripe(this.config.secretKey);
+    } else {
+      this.logger.warn(
+        'STRIPE_SECRET_KEY is not configured. Stripe payment features will be unavailable.',
+      );
+    }
+  }
+
+  private getStripe(): Stripe {
+    if (!this.stripe) {
+      throw new BadRequestException(
+        'Stripe is not configured. Please set STRIPE_SECRET_KEY.',
+      );
+    }
+    return this.stripe;
   }
 
   async createPaymentIntent(
@@ -39,7 +54,7 @@ export class DonationsService {
     const currency = dto.currency || 'usd';
     const amountInCents = Math.round(dto.amount * 100);
 
-    const paymentIntent = await this.stripe.paymentIntents.create({
+    const paymentIntent = await this.getStripe().paymentIntents.create({
       amount: amountInCents,
       currency,
       metadata: { userId },
@@ -65,7 +80,7 @@ export class DonationsService {
     let event: Stripe.Event;
 
     try {
-      event = this.stripe.webhooks.constructEvent(
+      event = this.getStripe().webhooks.constructEvent(
         rawBody,
         signature,
         this.config.webhookSecret,
