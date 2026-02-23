@@ -2,6 +2,7 @@ import {
   Injectable,
   Logger,
   BadRequestException,
+  NotFoundException,
   Inject,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -118,6 +119,48 @@ export class DonationsService {
     }
 
     return { received: true };
+  }
+
+  async confirmDonation(donationId: string) {
+    const donation = await this.donationModel.findById(donationId);
+    if (!donation) {
+      throw new NotFoundException('Donation not found');
+    }
+
+    if (donation.status !== DonationStatus.PENDING) {
+      return { donationId: donation._id.toString(), status: donation.status };
+    }
+
+    if (donation.method === DonationMethod.STRIPE && donation.stripePaymentIntentId) {
+      const paymentIntent = await this.getStripe().paymentIntents.retrieve(
+        donation.stripePaymentIntentId,
+      );
+
+      if (paymentIntent.status === 'succeeded') {
+        donation.status = DonationStatus.COMPLETED;
+      } else if (
+        paymentIntent.status === 'canceled' ||
+        paymentIntent.status === 'requires_payment_method'
+      ) {
+        donation.status = DonationStatus.FAILED;
+      }
+
+      await donation.save();
+      this.logger.log(
+        `Donation ${donationId} confirmed with status: ${donation.status}`,
+      );
+    }
+
+    return { donationId: donation._id.toString(), status: donation.status };
+  }
+
+  async deleteDonation(donationId: string) {
+    const donation = await this.donationModel.findByIdAndDelete(donationId);
+    if (!donation) {
+      throw new NotFoundException('Donation not found');
+    }
+    this.logger.log(`Donation ${donationId} deleted by admin`);
+    return { deleted: true };
   }
 
   async createEspeesDonation(userId: string, dto: CreateEspeesDonationDto) {

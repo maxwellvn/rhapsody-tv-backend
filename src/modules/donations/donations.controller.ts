@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Body,
+  Param,
   Query,
   Headers,
   RawBody,
@@ -63,6 +64,18 @@ export class DonationsController {
   ) {
     const data = await this.donationsService.handleWebhook(signature, rawBody);
     return data;
+  }
+
+  @Post(':id/confirm')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Confirm a donation by checking Stripe payment status' })
+  async confirmDonation(@Param('id') donationId: string) {
+    const data = await this.donationsService.confirmDonation(donationId);
+    return {
+      success: true,
+      message: 'Donation status verified',
+      data,
+    };
   }
 
   @Get('my')
