@@ -269,6 +269,7 @@ export class NotificationsService {
       title: `New Schedule: ${title}`,
       body: `${channel.name} has a new schedule`,
       data: {
+        type: NotificationType.CHANNEL_NEW_SCHEDULE,
         channelId,
         channelSlug: channel.slug,
         scheduleId: params.scheduleId,
