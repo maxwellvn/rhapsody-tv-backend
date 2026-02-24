@@ -11,6 +11,7 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export enum CustomNotificationActionType {
   EXTERNAL_URL = 'external_url',
@@ -78,6 +79,7 @@ export class CreateCustomNotificationDto {
     description: 'Optional target users. If omitted, sends to all active users.',
   })
   @IsOptional()
+  @Transform(({ value }) => (Array.isArray(value) ? value : value ? [value] : []))
   @IsArray()
   @ArrayMaxSize(5000)
   @IsMongoId({ each: true })
