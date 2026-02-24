@@ -271,6 +271,162 @@ export class NotificationsService {
     return { skipped: false };
   }
 
+  async notifyCustom(params: {
+    title: string;
+    body: string;
+    userIds: string[];
+    data?: Record<string, unknown>;
+  }) {
+    if (params.userIds.length === 0) {
+      return { count: 0 };
+    }
+
+    await this.notificationModel.insertMany(
+      params.userIds.map((userId) => ({
+        userId: new Types.ObjectId(userId),
+        type: NotificationType.CUSTOM,
+        title: params.title,
+        body: params.body,
+        data: params.data,
+        isRead: false,
+      })),
+    );
+
+    return { count: params.userIds.length };
+  }
+
+  async findCustomNotifications(params: {
+    page: number;
+    limit: number;
+    search?: string;
+  }) {
+    const matchStage: Record<string, unknown> = {
+      type: NotificationType.CUSTOM,
+    };
+
+    if (params.search) {
+      matchStage.$or = [
+        { title: { $regex: params.search, $options: 'i' } },
+        { body: { $regex: params.search, $options: 'i' } },
+      ];
+    }
+
+    const pipeline = [
+      { $match: matchStage },
+      {
+        $group: {
+          _id: {
+            title: '$title',
+            body: '$body',
+            createdAt: {
+              $dateToString: { format: '%Y-%m-%dT%H:%M', date: '$createdAt' },
+            },
+          },
+          sampleId: { $first: '$_id' },
+          title: { $first: '$title' },
+          body: { $first: '$body' },
+          data: { $first: '$data' },
+          recipientCount: { $sum: 1 },
+          readCount: {
+            $sum: { $cond: ['$isRead', 1, 0] },
+          },
+          createdAt: { $first: '$createdAt' },
+        },
+      },
+      { $sort: { createdAt: -1 as const } },
+      {
+        $facet: {
+          items: [
+            { $skip: (params.page - 1) * params.limit },
+            { $limit: params.limit },
+          ],
+          totalCount: [{ $count: 'count' }],
+        },
+      },
+    ];
+
+    const [result] = await this.notificationModel.aggregate(pipeline);
+    const items = result?.items || [];
+    const total = result?.totalCount?.[0]?.count || 0;
+
+    return {
+      notifications: items.map((item: any) => ({
+        id: item.sampleId.toString(),
+        title: item.title,
+        body: item.body,
+        data: item.data,
+        recipientCount: item.recipientCount,
+        readCount: item.readCount,
+        createdAt: item.createdAt,
+      })),
+      total,
+      page: params.page,
+      limit: params.limit,
+      pages: Math.ceil(total / params.limit),
+    };
+  }
+
+  async findCustomNotificationById(id: string) {
+    const notification = await this.notificationModel.findById(id).lean();
+    if (!notification || notification.type !== NotificationType.CUSTOM) {
+      return null;
+    }
+
+    const createdAtMinute = new Date(notification.createdAt);
+    createdAtMinute.setSeconds(0, 0);
+    const nextMinute = new Date(createdAtMinute.getTime() + 60000);
+
+    const stats = await this.notificationModel.aggregate([
+      {
+        $match: {
+          type: NotificationType.CUSTOM,
+          title: notification.title,
+          body: notification.body,
+          createdAt: { $gte: createdAtMinute, $lt: nextMinute },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          recipientCount: { $sum: 1 },
+          readCount: { $sum: { $cond: ['$isRead', 1, 0] } },
+        },
+      },
+    ]);
+
+    const stat = stats[0] || { recipientCount: 0, readCount: 0 };
+
+    return {
+      id: notification._id.toString(),
+      title: notification.title,
+      body: notification.body,
+      data: notification.data,
+      recipientCount: stat.recipientCount,
+      readCount: stat.readCount,
+      createdAt: notification.createdAt,
+    };
+  }
+
+  async deleteCustomNotificationBatch(id: string) {
+    const notification = await this.notificationModel.findById(id).lean();
+    if (!notification || notification.type !== NotificationType.CUSTOM) {
+      return { deletedCount: 0 };
+    }
+
+    const createdAtMinute = new Date(notification.createdAt);
+    createdAtMinute.setSeconds(0, 0);
+    const nextMinute = new Date(createdAtMinute.getTime() + 60000);
+
+    const result = await this.notificationModel.deleteMany({
+      type: NotificationType.CUSTOM,
+      title: notification.title,
+      body: notification.body,
+      createdAt: { $gte: createdAtMinute, $lt: nextMinute },
+    });
+
+    return { deletedCount: result.deletedCount };
+  }
+
   async notifyAnnouncement(params: {
     title: string;
     body: string;

@@ -10,6 +10,7 @@ export enum NotificationType {
   COMMENT_LIKED = 'comment_liked',
   COMMENT_REPLIED = 'comment_replied',
   ANNOUNCEMENT = 'announcement',
+  CUSTOM = 'custom',
 }
 
 @Schema({ timestamps: true })
