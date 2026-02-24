@@ -73,7 +73,7 @@ export class AdminSchedulesService {
 
   private async populateTargetNames(
     schedules: ScheduleDocument[],
-  ): Promise<Record<string, unknown>[]> {
+  ): Promise<any[]> {
     const channelIds = schedules
       .filter((s) => s.targetType === ScheduleTargetType.CHANNEL)
       .map((s) => s.targetId);
@@ -106,7 +106,7 @@ export class AdminSchedulesService {
     }
 
     return schedules.map((s) => {
-      const obj: Record<string, unknown> = s.toObject({ virtuals: true });
+      const obj = s.toObject({ virtuals: true }) as any;
       obj.targetName =
         s.targetType === ScheduleTargetType.CHANNEL
           ? channelMap.get(String(s.targetId))
