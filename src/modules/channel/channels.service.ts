@@ -151,9 +151,10 @@ export class ChannelsService {
     fallbackLiveStreamId?: string,
     referenceDate?: Date,
   ): ChannelProgramDto {
-    const window = resolveScheduleWindow(schedule, referenceDate) ?? {
-      startTime: new Date(schedule.startTime),
-      endTime: new Date(schedule.endTime),
+    const now = referenceDate ?? new Date();
+    const window = resolveScheduleWindow(schedule, now) ?? {
+      startTime: schedule.startTime ? new Date(schedule.startTime) : now,
+      endTime: schedule.endTime ? new Date(schedule.endTime) : now,
     };
 
     const title = schedule.title || program?.title || channel?.name || 'Untitled';
@@ -451,21 +452,45 @@ export class ChannelsService {
       endOfDay.setHours(23, 59, 59, 999);
 
       // Add date filtering for schedule types
+      // Recurring (daily/weekly) without startTime/endTime are lifetime and always match
+      // We use $and to combine with the existing target filter
+      const lifetimeOrInRange = {
+        $or: [
+          { startTime: { $exists: false } },
+          { startTime: null },
+          {
+            startTime: { $lte: endOfDay },
+            endTime: { $gte: startOfDay },
+          },
+          {
+            startTime: { $lte: endOfDay },
+            endTime: null,
+          },
+          {
+            startTime: { $lte: endOfDay },
+            endTime: { $exists: false },
+          },
+        ],
+      };
+
+      const dateFilter = {
+        $or: [
+          // Daily: lifetime or within effective range
+          { scheduleType: 'daily', ...lifetimeOrInRange },
+          // Weekly: correct day + lifetime or within effective range
+          { scheduleType: 'weekly', daysOfWeek: parsed.getUTCDay(), ...lifetimeOrInRange },
+          // Once: must have start/end overlapping the day
+          {
+            scheduleType: 'once',
+            startTime: { $lte: endOfDay },
+            endTime: { $gte: startOfDay },
+          },
+        ],
+      };
+
       (scheduleQuery as any).$and = [
         (scheduleQuery as any).$or ? { $or: (scheduleQuery as any).$or } : {},
-        {
-          $or: [
-            { scheduleType: 'daily' },
-            { scheduleType: 'weekly', daysOfWeek: parsed.getUTCDay() },
-            {
-              $or: [
-                { scheduleType: 'once' },
-                { scheduleType: { $exists: false } },
-              ],
-              startTime: { $gte: startOfDay, $lte: endOfDay },
-            },
-          ],
-        },
+        dateFilter,
       ];
       delete (scheduleQuery as any).$or;
     }
@@ -474,7 +499,7 @@ export class ChannelsService {
 
     const schedules = await this.scheduleModel
       .find(scheduleQuery)
-      .sort({ startTime: 1 })
+      .sort({ createdAt: 1 })
       .limit(safeLimit);
 
     const defaultLiveStreamId =

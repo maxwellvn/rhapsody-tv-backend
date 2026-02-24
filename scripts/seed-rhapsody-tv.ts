@@ -222,21 +222,19 @@ async function seed() {
   // 6. Create Schedules for the programs
   console.log('Creating Schedules...');
 
-  // Daily schedule for Rhapsody Daily
+  // Daily schedule for Rhapsody Daily (lifetime - no start/end dates)
   await ScheduleModel.create({
     targetType: 'program',
     targetId: program1._id,
     scheduleType: 'daily',
     startTimeOfDay: '06:00',
     endTimeOfDay: '07:00',
-    startTime: new Date(now.getTime() - 15 * 60000),
-    endTime: new Date(now.getTime() + 45 * 60000),
     durationInMinutes: 60,
     timezone: 'UTC',
     isActive: true,
   });
 
-  // Weekly schedule for Morning Inspiration
+  // Weekly schedule for Morning Inspiration (lifetime - no start/end dates)
   await ScheduleModel.create({
     targetType: 'program',
     targetId: program2._id,
@@ -244,14 +242,12 @@ async function seed() {
     startTimeOfDay: '08:00',
     endTimeOfDay: '09:00',
     daysOfWeek: [1, 3, 5], // Mon, Wed, Fri
-    startTime: new Date(now.getTime() - 3 * 60 * 60000),
-    endTime: new Date(now.getTime() - 2 * 60 * 60000),
     durationInMinutes: 60,
     timezone: 'UTC',
     isActive: true,
   });
 
-  // One-time schedule for Evening Praise
+  // One-time schedule for Evening Praise (requires start/end)
   await ScheduleModel.create({
     targetType: 'program',
     targetId: program3._id,
@@ -263,15 +259,13 @@ async function seed() {
     isActive: true,
   });
 
-  // Channel-level schedule
+  // Channel-level schedule (lifetime - no start/end dates)
   await ScheduleModel.create({
     targetType: 'channel',
     targetId: channel._id,
     scheduleType: 'daily',
     startTimeOfDay: '00:00',
     endTimeOfDay: '23:59',
-    startTime: now,
-    endTime: new Date(now.getTime() + 365 * 24 * 60 * 60000),
     title: '24/7 Broadcast',
     description: 'Round-the-clock programming on Rhapsody TV.',
     timezone: 'UTC',

@@ -106,29 +106,17 @@ export function normalizeScheduleData(
     );
   }
 
-  const effectiveReferenceDate =
-    toDate(dto.startTime ?? existing?.startTime) ?? new Date();
-  const resolvedStartTime = dateFromTimeOfDay(
-    startTimeOfDay,
-    effectiveReferenceDate,
-  );
-  const fallbackEndTime = dateFromTimeOfDay(
-    endTimeOfDay,
-    effectiveReferenceDate,
-  );
-  if (fallbackEndTime <= resolvedStartTime) {
-    fallbackEndTime.setUTCDate(fallbackEndTime.getUTCDate() + 1);
-  }
-  const effectiveEnd =
-    toDate(dto.endTime ?? existing?.endTime) ?? fallbackEndTime;
+  // startTime/endTime are optional for recurring schedules (lifetime if omitted)
+  const startTime = toDate(dto.startTime) ?? toDate(existing?.startTime);
+  const endTime = toDate(dto.endTime) ?? toDate(existing?.endTime);
 
   return {
     scheduleType,
     startTimeOfDay,
     endTimeOfDay,
     daysOfWeek,
-    startTime: resolvedStartTime,
-    endTime: effectiveEnd,
+    startTime: startTime ?? undefined,
+    endTime: endTime ?? undefined,
     durationInMinutes: durationFromTimes(startTimeOfDay, endTimeOfDay),
     timezone,
   };
@@ -139,12 +127,17 @@ export function resolveScheduleWindow(
   referenceDate = new Date(),
 ): { startTime: Date; endTime: Date } | null {
   if (!schedule.startTimeOfDay || !schedule.endTimeOfDay) {
-    const startTime = new Date(schedule.startTime);
-    const endTime = new Date(schedule.endTime);
-    if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
-      return null;
+    // 'once' schedule or no time-of-day info
+    if (schedule.startTime && schedule.endTime) {
+      const startTime = new Date(schedule.startTime);
+      const endTime = new Date(schedule.endTime);
+      if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
+        return null;
+      }
+      return { startTime, endTime };
     }
-    return { startTime, endTime };
+    // No dates at all - lifetime schedule, resolve to reference date
+    return null;
   }
 
   if (

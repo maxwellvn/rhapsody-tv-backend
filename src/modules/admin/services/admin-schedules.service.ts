@@ -77,7 +77,7 @@ export class AdminSchedulesService {
     const {
       page = 1,
       limit = 10,
-      sortBy = 'startTime',
+      sortBy = 'createdAt',
       sortOrder = 'asc',
       search,
       targetType,
@@ -110,7 +110,7 @@ export class AdminSchedulesService {
       'scheduleType',
       'targetType',
     ]);
-    const resolvedSortBy = allowedSortFields.has(sortBy) ? sortBy : 'startTime';
+    const resolvedSortBy = allowedSortFields.has(sortBy) ? sortBy : 'createdAt';
     const resolvedSortOrder = sortOrder === 'desc' ? -1 : 1;
 
     const [schedules, total] = await Promise.all([

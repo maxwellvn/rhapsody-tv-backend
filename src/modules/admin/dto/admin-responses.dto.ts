@@ -211,11 +211,11 @@ export class ScheduleResponseDto {
   @ApiPropertyOptional({ type: [Number], example: [1, 3, 5] })
   daysOfWeek?: number[];
 
-  @ApiProperty({ example: '2026-01-15T08:00:00.000Z' })
-  startTime: string;
+  @ApiPropertyOptional({ example: '2026-01-15T08:00:00.000Z' })
+  startTime?: string;
 
-  @ApiProperty({ example: '2026-01-15T09:00:00.000Z' })
-  endTime: string;
+  @ApiPropertyOptional({ example: '2026-01-15T09:00:00.000Z' })
+  endTime?: string;
 
   @ApiPropertyOptional({ example: 60 })
   durationInMinutes?: number;

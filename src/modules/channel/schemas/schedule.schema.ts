@@ -42,11 +42,11 @@ export class Schedule {
   @Prop({ type: [Number], default: undefined })
   daysOfWeek?: number[];
 
-  @Prop({ required: true })
-  startTime: Date;
+  @Prop()
+  startTime?: Date;
 
-  @Prop({ required: true })
-  endTime: Date;
+  @Prop()
+  endTime?: Date;
 
   @Prop()
   durationInMinutes?: number;
