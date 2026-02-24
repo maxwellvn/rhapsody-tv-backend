@@ -10,6 +10,7 @@ import {
   VideoVisibility,
 } from '../src/modules/stream/schemas/video.schema';
 import { ProgramSchema } from '../src/modules/channel/schemas/program.schema';
+import { ScheduleSchema } from '../src/modules/channel/schemas/schedule.schema';
 
 const REAL_CHANNEL = {
   name: 'Rhapsody TV',
@@ -40,6 +41,7 @@ async function seed() {
   const LiveStreamModel = mongoose.model('LiveStream', LiveStreamSchema);
   const VideoModel = mongoose.model('Video', VideoSchema);
   const ProgramModel = mongoose.model('Program', ProgramSchema);
+  const ScheduleModel = mongoose.model('Schedule', ScheduleSchema);
 
   // 1. Clean up existing channel data and any rows with mock URLs.
   console.log('Cleaning up old data...');
@@ -55,6 +57,7 @@ async function seed() {
     await LiveStreamModel.deleteMany({ channelId: { $in: mockChannelIds } });
     await VideoModel.deleteMany({ channelId: { $in: mockChannelIds } });
     await ProgramModel.deleteMany({ channelId: { $in: mockChannelIds } });
+    await ScheduleModel.deleteMany({ targetId: { $in: mockChannelIds } });
     await ChannelModel.deleteMany({ _id: { $in: mockChannelIds } });
     console.log(`Removed ${mockChannelIds.length} channel(s) with mock URLs.`);
   }
@@ -66,16 +69,19 @@ async function seed() {
     $or: [{ thumbnailUrl: mockUrlPattern }, { playbackUrl: mockUrlPattern }],
   });
 
-  // Remove invalid program rows that can break homepage mapping.
-  await ProgramModel.deleteMany({
-    $or: [{ startTime: { $exists: false } }, { endTime: { $exists: false } }],
-  });
-
   const existingChannel = await ChannelModel.findOne({ slug: 'rhapsody-tv' });
   if (existingChannel) {
     const channelId = existingChannel._id;
     await LiveStreamModel.deleteMany({ channelId });
     await VideoModel.deleteMany({ channelId });
+    const existingPrograms = await ProgramModel.find({ channelId }).select('_id');
+    const existingProgramIds = existingPrograms.map((p) => p._id);
+    await ScheduleModel.deleteMany({
+      $or: [
+        { targetType: 'channel', targetId: channelId },
+        { targetType: 'program', targetId: { $in: existingProgramIds } },
+      ],
+    });
     await ProgramModel.deleteMany({ channelId });
     await ChannelModel.deleteOne({ _id: channelId });
     console.log('Removed existing Rhapsody TV channel and related data.');
@@ -107,7 +113,7 @@ async function seed() {
     streamKey: 'live_key_123',
   });
 
-  const liveStream2 = await LiveStreamModel.create({
+  await LiveStreamModel.create({
     channelId: channel._id,
     title: 'Global Prayer Network',
     description: 'Weekly prayer session.',
@@ -177,49 +183,99 @@ async function seed() {
     },
   ]);
 
-  // 5. Create Programs
+  // 5. Create Programs (content-only, no schedule fields)
   console.log('Creating Programs...');
   const now = new Date();
 
-  // Current program (linked to the live stream)
-  await ProgramModel.create({
+  const program1 = await ProgramModel.create({
     channelId: channel._id,
     title: 'Rhapsody Daily',
     description: 'Daily devotional reading live.',
-    startTime: new Date(now.getTime() - 15 * 60000), // Started 15 mins ago
-    endTime: new Date(now.getTime() + 45 * 60000), // Ends in 45 mins
-    durationInMinutes: 60,
     category: 'Devotional',
+    announcementType: 'program',
     isLive: true,
     viewerCount: 1200,
     liveStreamId: liveStream1._id,
   });
 
-  // Past program (linked to a video)
-  await ProgramModel.create({
+  const program2 = await ProgramModel.create({
     channelId: channel._id,
     title: 'Morning Inspiration',
     description: 'Start your day with the word.',
-    startTime: new Date(now.getTime() - 3 * 60 * 60000), // 3 hours ago
-    endTime: new Date(now.getTime() - 2 * 60 * 60000), // 2 hours ago
-    durationInMinutes: 60,
     category: 'Inspiration',
+    announcementType: 'show',
     isLive: false,
     viewerCount: 0,
-    videoId: videos[0]._id, // Linked to the first video
+    videoId: videos[0]._id,
   });
 
-  // Future program
-  await ProgramModel.create({
+  const program3 = await ProgramModel.create({
     channelId: channel._id,
     title: 'Evening Praise',
     description: 'Worship session.',
-    startTime: new Date(now.getTime() + 5 * 60 * 60000), // In 5 hours
-    endTime: new Date(now.getTime() + 7 * 60 * 60000), // Ends in 7 hours
-    durationInMinutes: 120,
     category: 'Worship',
+    announcementType: 'event',
     isLive: false,
     viewerCount: 0,
+  });
+
+  // 6. Create Schedules for the programs
+  console.log('Creating Schedules...');
+
+  // Daily schedule for Rhapsody Daily
+  await ScheduleModel.create({
+    targetType: 'program',
+    targetId: program1._id,
+    scheduleType: 'daily',
+    startTimeOfDay: '06:00',
+    endTimeOfDay: '07:00',
+    startTime: new Date(now.getTime() - 15 * 60000),
+    endTime: new Date(now.getTime() + 45 * 60000),
+    durationInMinutes: 60,
+    timezone: 'UTC',
+    isActive: true,
+  });
+
+  // Weekly schedule for Morning Inspiration
+  await ScheduleModel.create({
+    targetType: 'program',
+    targetId: program2._id,
+    scheduleType: 'weekly',
+    startTimeOfDay: '08:00',
+    endTimeOfDay: '09:00',
+    daysOfWeek: [1, 3, 5], // Mon, Wed, Fri
+    startTime: new Date(now.getTime() - 3 * 60 * 60000),
+    endTime: new Date(now.getTime() - 2 * 60 * 60000),
+    durationInMinutes: 60,
+    timezone: 'UTC',
+    isActive: true,
+  });
+
+  // One-time schedule for Evening Praise
+  await ScheduleModel.create({
+    targetType: 'program',
+    targetId: program3._id,
+    scheduleType: 'once',
+    startTime: new Date(now.getTime() + 5 * 60 * 60000),
+    endTime: new Date(now.getTime() + 7 * 60 * 60000),
+    durationInMinutes: 120,
+    timezone: 'UTC',
+    isActive: true,
+  });
+
+  // Channel-level schedule
+  await ScheduleModel.create({
+    targetType: 'channel',
+    targetId: channel._id,
+    scheduleType: 'daily',
+    startTimeOfDay: '00:00',
+    endTimeOfDay: '23:59',
+    startTime: now,
+    endTime: new Date(now.getTime() + 365 * 24 * 60 * 60000),
+    title: '24/7 Broadcast',
+    description: 'Round-the-clock programming on Rhapsody TV.',
+    timezone: 'UTC',
+    isActive: true,
   });
 
   console.log('Successfully seeded Rhapsody TV data (mock URLs removed).');
