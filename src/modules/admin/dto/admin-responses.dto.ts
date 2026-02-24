@@ -170,6 +170,35 @@ export class ProgramResponseDto {
   @ApiPropertyOptional({ example: 'Start your day with us' })
   description?: string;
 
+  @ApiProperty({ enum: ['event', 'program', 'show', 'special'], example: 'program' })
+  announcementType: string;
+
+  @ApiPropertyOptional({ example: 'News' })
+  category?: string;
+
+  @ApiPropertyOptional({ example: 'https://ik.imagekit.io/...' })
+  thumbnailUrl?: string;
+
+  @ApiProperty({ example: true })
+  isActive: boolean;
+
+  @ApiProperty({ example: '2026-01-15T10:00:00.000Z' })
+  createdAt: string;
+
+  @ApiProperty({ example: '2026-01-15T10:00:00.000Z' })
+  updatedAt: string;
+}
+
+export class ScheduleResponseDto {
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  id: string;
+
+  @ApiProperty({ enum: ['channel', 'program'], example: 'program' })
+  targetType: string;
+
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  targetId: string;
+
   @ApiProperty({ enum: ['daily', 'weekly', 'once'], example: 'daily' })
   scheduleType: string;
 
@@ -191,17 +220,20 @@ export class ProgramResponseDto {
   @ApiPropertyOptional({ example: 60 })
   durationInMinutes?: number;
 
-  @ApiPropertyOptional({ example: 'News' })
-  category?: string;
-
   @ApiPropertyOptional({ example: 'UTC' })
   timezone?: string;
 
-  @ApiPropertyOptional({ example: 'https://ik.imagekit.io/...' })
-  thumbnailUrl?: string;
+  @ApiPropertyOptional({ example: 'Morning Broadcast' })
+  title?: string;
+
+  @ApiPropertyOptional({ example: 'Daily morning broadcast' })
+  description?: string;
 
   @ApiProperty({ example: true })
   isActive: boolean;
+
+  @ApiPropertyOptional({ description: 'Populated target name' })
+  targetName?: string;
 
   @ApiProperty({ example: '2026-01-15T10:00:00.000Z' })
   createdAt: string;
@@ -273,6 +305,17 @@ export class PaginatedVideosResponseDto {
 export class PaginatedProgramsResponseDto {
   @ApiProperty({ type: [ProgramResponseDto] })
   programs: ProgramResponseDto[];
+
+  @ApiProperty({ example: 100 })
+  total: number;
+
+  @ApiProperty({ example: 10 })
+  pages: number;
+}
+
+export class PaginatedSchedulesResponseDto {
+  @ApiProperty({ type: [ScheduleResponseDto] })
+  schedules: ScheduleResponseDto[];
 
   @ApiProperty({ example: 100 })
   total: number;

@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ImageKitModule } from '../../shared/services/imagekit/imagekit.module';
 import { Channel, ChannelSchema } from '../channel/schemas/channel.schema';
 import { Program, ProgramSchema } from '../channel/schemas/program.schema';
+import { Schedule, ScheduleSchema } from '../channel/schemas/schedule.schema';
 import { User, UserSchema } from '../user/schemas/user.schema';
 import { Watchlist, WatchlistSchema } from '../user/schemas/watchlist.schema';
 import {
@@ -37,6 +38,7 @@ import { AdminModerationController } from './controllers/admin-moderation.contro
 import { AdminUsersController } from './controllers/admin-users.controller';
 import { AdminVideosController } from './controllers/admin-videos.controller';
 import { AdminProgramsController } from './controllers/admin-programs.controller';
+import { AdminSchedulesController } from './controllers/admin-schedules.controller';
 import { AdminUploadController } from './controllers/admin-upload.controller';
 import { AdminNotificationsController } from './controllers/admin-notifications.controller';
 import { AdminChannelsService } from './services/admin-channels.service';
@@ -46,6 +48,7 @@ import { AdminModerationService } from './services/admin-moderation.service';
 import { AdminUsersService } from './services/admin-users.service';
 import { AdminVideosService } from './services/admin-videos.service';
 import { AdminProgramsService } from './services/admin-programs.service';
+import { AdminSchedulesService } from './services/admin-schedules.service';
 import { AdminNotificationsService } from './services/admin-notifications.service';
 import { NotificationsModule } from '../notifications';
 
@@ -57,6 +60,7 @@ import { NotificationsModule } from '../notifications';
       { name: User.name, schema: UserSchema },
       { name: Channel.name, schema: ChannelSchema },
       { name: Program.name, schema: ProgramSchema },
+      { name: Schedule.name, schema: ScheduleSchema },
       { name: Watchlist.name, schema: WatchlistSchema },
       { name: LiveStream.name, schema: LiveStreamSchema },
       { name: LiveStreamComment.name, schema: LiveStreamCommentSchema },
@@ -75,6 +79,7 @@ import { NotificationsModule } from '../notifications';
     AdminModerationController,
     AdminVideosController,
     AdminProgramsController,
+    AdminSchedulesController,
     AdminUploadController,
     AdminNotificationsController,
   ],
@@ -86,6 +91,7 @@ import { NotificationsModule } from '../notifications';
     AdminModerationService,
     AdminVideosService,
     AdminProgramsService,
+    AdminSchedulesService,
     AdminNotificationsService,
   ],
 })

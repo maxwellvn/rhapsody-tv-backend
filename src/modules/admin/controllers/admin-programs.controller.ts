@@ -24,7 +24,6 @@ import {
   ApiCreatedSuccessResponse,
   ApiOkSuccessResponse,
 } from '../../../common/swagger';
-import { ProgramScheduleType } from '../../channel/schemas/program.schema';
 
 @ApiTags('Admin Programs')
 @ApiBearerAuth()
@@ -56,11 +55,6 @@ export class AdminProgramsController {
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'sortBy', required: false, type: String })
   @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
-  @ApiQuery({
-    name: 'scheduleType',
-    required: false,
-    enum: ProgramScheduleType,
-  })
   @ApiOkSuccessResponse({
     description: 'Programs retrieved successfully',
     model: PaginatedProgramsResponseDto,
@@ -71,7 +65,6 @@ export class AdminProgramsController {
     @Query('search') search?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
-    @Query('scheduleType') scheduleType?: ProgramScheduleType,
   ) {
     const result = await this.adminProgramsService.findAll({
       page,
@@ -79,7 +72,6 @@ export class AdminProgramsController {
       search,
       sortBy,
       sortOrder,
-      scheduleType,
     });
     return {
       success: true,

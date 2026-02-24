@@ -1,19 +1,12 @@
 import {
   IsString,
   IsOptional,
-  IsDateString,
   IsMongoId,
   MaxLength,
   IsEnum,
-  IsArray,
-  ArrayMinSize,
-  IsInt,
-  Min,
-  Max,
-  Matches,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ProgramScheduleType } from '../../../channel/schemas/program.schema';
+import { AnnouncementType } from '../../../channel/schemas/program.schema';
 
 export class CreateProgramDto {
   @ApiProperty({
@@ -35,68 +28,12 @@ export class CreateProgramDto {
   description?: string;
 
   @ApiProperty({
-    enum: ProgramScheduleType,
-    example: ProgramScheduleType.DAILY,
-    description: 'Schedule type',
+    enum: AnnouncementType,
+    example: AnnouncementType.PROGRAM,
+    description: 'Announcement type for notifications',
   })
-  @IsEnum(ProgramScheduleType)
-  scheduleType: ProgramScheduleType;
-
-  @ApiPropertyOptional({
-    example: '08:00',
-    description: 'Time of day in HH:mm for daily/weekly schedules',
-  })
-  @IsOptional()
-  @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/)
-  startTimeOfDay?: string;
-
-  @ApiPropertyOptional({
-    example: '09:00',
-    description: 'Time of day in HH:mm for daily/weekly schedules',
-  })
-  @IsOptional()
-  @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/)
-  endTimeOfDay?: string;
-
-  @ApiPropertyOptional({
-    type: [Number],
-    example: [1, 3, 5],
-    description: 'Days for weekly schedules (0=Sunday ... 6=Saturday)',
-  })
-  @IsOptional()
-  @IsArray()
-  @ArrayMinSize(1)
-  @IsInt({ each: true })
-  @Min(0, { each: true })
-  @Max(6, { each: true })
-  daysOfWeek?: number[];
-
-  @ApiProperty({
-    example: '2026-01-15T08:00:00.000Z',
-    description:
-      'Start time. Required for once schedules; optional effective start for daily/weekly',
-  })
-  @IsOptional()
-  @IsDateString()
-  startTime?: string;
-
-  @ApiProperty({
-    example: '2026-01-15T09:00:00.000Z',
-    description:
-      'End time. Required for once schedules; optional effective end for daily/weekly',
-  })
-  @IsOptional()
-  @IsDateString()
-  endTime?: string;
-
-  @ApiPropertyOptional({
-    example: 'UTC',
-    description: 'Timezone for recurring schedules',
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  timezone?: string;
+  @IsEnum(AnnouncementType)
+  announcementType: AnnouncementType;
 
   @ApiPropertyOptional({ example: 'News' })
   @IsOptional()

@@ -53,50 +53,6 @@ export class HomepageService {
     return fallback.toISOString();
   }
 
-  private resolveProgramWindow(
-    program: ProgramDocument,
-    referenceDate = new Date(),
-  ): { startTime: Date; endTime: Date } | null {
-    if (!program.startTimeOfDay || !program.endTimeOfDay) {
-      const startTime = new Date(program.startTime);
-      const endTime = new Date(program.endTime);
-      if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
-        return null;
-      }
-      return { startTime, endTime };
-    }
-
-    if (
-      program.scheduleType === 'weekly' &&
-      program.daysOfWeek?.length &&
-      !program.daysOfWeek.includes(referenceDate.getUTCDay())
-    ) {
-      return null;
-    }
-
-    if (program.startTime && referenceDate < new Date(program.startTime)) {
-      return null;
-    }
-
-    if (program.endTime && referenceDate > new Date(program.endTime)) {
-      return null;
-    }
-
-    const [startHours, startMinutes] = program.startTimeOfDay.split(':').map(Number);
-    const [endHours, endMinutes] = program.endTimeOfDay.split(':').map(Number);
-
-    const startTime = new Date(referenceDate);
-    startTime.setUTCHours(startHours, startMinutes, 0, 0);
-
-    const endTime = new Date(referenceDate);
-    endTime.setUTCHours(endHours, endMinutes, 0, 0);
-    if (endTime <= startTime) {
-      endTime.setUTCDate(endTime.getUTCDate() + 1);
-    }
-
-    return { startTime, endTime };
-  }
-
   private toChannelDto(channel: ChannelDocument): HomepageChannelDto {
     return {
       id: channel._id.toString(),
@@ -149,26 +105,15 @@ export class HomepageService {
     const channelValue = (program as unknown as { channelId?: unknown })
       .channelId;
     const populatedChannel = this.resolvePopulatedChannel(channelValue);
-
-    const window = this.resolveProgramWindow(program) ?? {
-      startTime: new Date(program.startTime),
-      endTime: new Date(program.endTime),
-    };
+    const now = new Date();
 
     return {
       id: program._id.toString(),
       title: program.title,
       description: program.description,
-      scheduleType: program.scheduleType,
-      startTimeOfDay: program.startTimeOfDay,
-      endTimeOfDay: program.endTimeOfDay,
-      daysOfWeek: program.daysOfWeek,
-      timezone: program.timezone,
-      startTime: this.toIsoStringSafe(window.startTime),
-      endTime: this.toIsoStringSafe(window.endTime),
-      isLive:
-        program.isLive ||
-        (new Date() >= window.startTime && new Date() <= window.endTime),
+      startTime: now.toISOString(),
+      endTime: now.toISOString(),
+      isLive: program.isLive,
       channel: populatedChannel
         ? this.toChannelDto(populatedChannel)
         : undefined,
@@ -264,7 +209,6 @@ export class HomepageService {
       createdAt: -1,
     });
 
-    // Split into channels with explicit displayOrder and those without
     const ordered = channels.filter((c) => c.displayOrder != null);
     const unordered = channels.filter((c) => c.displayOrder == null);
 
@@ -288,7 +232,6 @@ export class HomepageService {
       });
     }
 
-    // Unordered channels keep existing priority logic
     const sortedUnordered = [...unordered].sort((a, b) => {
       const aIsPrimary = a.slug === this.PRIMARY_HOME_CHANNEL_SLUG;
       const bIsPrimary = b.slug === this.PRIMARY_HOME_CHANNEL_SLUG;
@@ -326,7 +269,6 @@ export class HomepageService {
       );
     });
 
-    // Ordered channels first (already sorted by displayOrder from DB), then unordered
     const combined = [...ordered, ...sortedUnordered];
 
     return combined.slice(0, safeLimit).map((c) => this.toChannelDto(c));
@@ -337,10 +279,10 @@ export class HomepageService {
     const programs = await this.programModel
       .find({ isActive: true })
       .populate('channelId', 'name slug logoUrl coverImageUrl')
-      .sort({ isLive: -1, createdAt: -1, startTime: 1 })
+      .sort({ isLive: -1, createdAt: -1 })
       .limit(safeLimit);
 
-    // Build ID candidates matching both string and ObjectId forms (MongoDB may store either)
+    // Build ID candidates matching both string and ObjectId forms
     const programIdCandidates = programs.flatMap((p) => {
       const id = p._id;
       const candidates: Array<string | Types.ObjectId> = [];
@@ -360,7 +302,7 @@ export class HomepageService {
       return candidates;
     });
 
-    // Count videos linked via video.programId (match both string and ObjectId)
+    // Count videos linked via video.programId
     const videoCounts = await this.videoModel.aggregate([
       {
         $match: {
@@ -374,8 +316,6 @@ export class HomepageService {
       videoCounts.map((v) => [v._id.toString(), v.count]),
     );
 
-    // For programs that have a direct videoId but no videos counted via video.programId,
-    // check if the linked video exists and is public
     const programsWithDirectVideo = programs.filter(
       (p) => p.videoId && !countMap.has(p._id.toString()),
     );
@@ -688,7 +628,7 @@ export class HomepageService {
         .find(programFilter)
         .limit(200)
         .populate('channelId', 'name slug logoUrl coverImageUrl')
-        .sort({ isLive: -1, startTime: 1 })
+        .sort({ isLive: -1, createdAt: -1 })
         .exec(),
     ]);
 
@@ -720,15 +660,16 @@ export class HomepageService {
       subscriberCount: c.subscriberCount ?? 0,
     }));
 
+    const now = new Date();
     const programs: SearchProgramResultDto[] = scoredPrograms.slice(0, safeLimit).map(({ p }) => {
       const ch = this.resolvePopulatedChannel((p as any).channelId);
+      const createdAt = (p as any).createdAt;
       return {
         id: p._id.toString(),
         title: p.title,
         description: p.description,
-        scheduleType: p.scheduleType,
-        startTime: p.startTime.toISOString(),
-        endTime: p.endTime.toISOString(),
+        startTime: createdAt ? this.toIsoStringSafe(createdAt) : now.toISOString(),
+        endTime: createdAt ? this.toIsoStringSafe(createdAt) : now.toISOString(),
         isLive: !!(p as any).isLive,
         thumbnailUrl: (p as any).thumbnailUrl,
         channel: ch ? this.toChannelDto(ch) : undefined,

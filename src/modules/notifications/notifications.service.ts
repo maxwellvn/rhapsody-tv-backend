@@ -197,7 +197,7 @@ export class NotificationsService {
     channelId: string;
     programId: string;
     programTitle: string;
-    startTime: string;
+    announcementPrefix?: string;
   }) {
     const channel = await this.buildChannelContext(params.channelId);
     const program = await this.programModel
@@ -205,12 +205,14 @@ export class NotificationsService {
       .select('thumbnailUrl')
       .lean();
 
+    const prefix = params.announcementPrefix ?? 'New Program';
+
     return this.notifyChannelSubscribers({
       channelId: params.channelId,
       type: NotificationType.CHANNEL_NEW_PROGRAM,
       preferenceKey: 'notifyOnNewProgram',
-      title: `New program on ${channel.name}`,
-      body: `${params.programTitle} • ${params.startTime}`,
+      title: `${prefix}: ${params.programTitle}`,
+      body: `${channel.name}`,
       data: {
         channelId: params.channelId,
         channelSlug: channel.slug,

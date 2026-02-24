@@ -3,10 +3,11 @@ import { HydratedDocument, Types } from 'mongoose';
 
 export type ProgramDocument = HydratedDocument<Program>;
 
-export enum ProgramScheduleType {
-  DAILY = 'daily',
-  WEEKLY = 'weekly',
-  ONCE = 'once',
+export enum AnnouncementType {
+  EVENT = 'event',
+  PROGRAM = 'program',
+  SHOW = 'show',
+  SPECIAL = 'special',
 }
 
 @Schema({ timestamps: true })
@@ -20,40 +21,19 @@ export class Program {
   @Prop({ trim: true })
   description?: string;
 
-  @Prop({
-    required: true,
-    enum: ProgramScheduleType,
-    default: ProgramScheduleType.ONCE,
-    index: true,
-  })
-  scheduleType: ProgramScheduleType;
-
-  @Prop({ trim: true })
-  startTimeOfDay?: string;
-
-  @Prop({ trim: true })
-  endTimeOfDay?: string;
-
-  @Prop({ type: [Number], default: undefined })
-  daysOfWeek?: number[];
-
-  @Prop({ required: true })
-  startTime: Date;
-
-  @Prop({ required: true })
-  endTime: Date;
-
-  @Prop()
-  durationInMinutes?: number;
-
   @Prop({ trim: true })
   category?: string;
 
-  @Prop({ trim: true, default: 'UTC' })
-  timezone?: string;
-
   @Prop({ trim: true })
   thumbnailUrl?: string;
+
+  @Prop({
+    required: true,
+    enum: AnnouncementType,
+    default: AnnouncementType.PROGRAM,
+    index: true,
+  })
+  announcementType: AnnouncementType;
 
   @Prop({ default: false })
   isLive: boolean;
@@ -76,6 +56,5 @@ export class Program {
 
 export const ProgramSchema = SchemaFactory.createForClass(Program);
 
-ProgramSchema.index({ channelId: 1, startTime: 1 });
-ProgramSchema.index({ startTime: 1, endTime: 1 });
+ProgramSchema.index({ channelId: 1, isActive: 1 });
 ProgramSchema.index({ isLive: 1 });

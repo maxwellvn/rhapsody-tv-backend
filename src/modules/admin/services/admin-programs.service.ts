@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,10 +7,17 @@ import { Model } from 'mongoose';
 import {
   Program,
   ProgramDocument,
-  ProgramScheduleType,
+  AnnouncementType,
 } from '../../channel/schemas/program.schema';
 import { CreateProgramDto, UpdateProgramDto } from '../dto/programs';
 import { NotificationsService } from '../../notifications';
+
+const ANNOUNCEMENT_PREFIX_MAP: Record<AnnouncementType, string> = {
+  [AnnouncementType.EVENT]: 'New Event',
+  [AnnouncementType.PROGRAM]: 'New Program',
+  [AnnouncementType.SHOW]: 'New Show',
+  [AnnouncementType.SPECIAL]: 'Special Announcement',
+};
 
 type ProgramListParams = {
   page?: number;
@@ -19,7 +25,6 @@ type ProgramListParams = {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   search?: string;
-  scheduleType?: ProgramScheduleType;
 };
 
 @Injectable()
@@ -29,146 +34,27 @@ export class AdminProgramsService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  private toDate(value?: string | Date): Date | undefined {
-    if (!value) return undefined;
-    const parsed = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(parsed.getTime())) return undefined;
-    return parsed;
-  }
-
-  private durationFromTimes(startTimeOfDay: string, endTimeOfDay: string): number {
-    const [startHours, startMinutes] = startTimeOfDay.split(':').map(Number);
-    const [endHours, endMinutes] = endTimeOfDay.split(':').map(Number);
-    const start = startHours * 60 + startMinutes;
-    const end = endHours * 60 + endMinutes;
-    const duration = end > start ? end - start : 24 * 60 - start + end;
-    return duration;
-  }
-
-  private dateFromTimeOfDay(timeOfDay: string, base: Date): Date {
-    const [hours, minutes] = timeOfDay.split(':').map(Number);
-    const date = new Date(base);
-    date.setUTCHours(hours, minutes, 0, 0);
-    return date;
-  }
-
-  private normalizeProgramData(
-    dto: Partial<CreateProgramDto>,
-    existing?: ProgramDocument,
-  ): Record<string, unknown> {
-    const scheduleType =
-      dto.scheduleType ??
-      existing?.scheduleType ??
-      ProgramScheduleType.ONCE;
-
-    const category = dto.category ?? existing?.category;
-    const description = dto.description ?? existing?.description;
-    const thumbnailUrl = dto.thumbnailUrl ?? existing?.thumbnailUrl;
-    const timezone = dto.timezone ?? existing?.timezone ?? 'UTC';
-
-    if (scheduleType === ProgramScheduleType.ONCE) {
-      const startTime = this.toDate(dto.startTime ?? existing?.startTime);
-      const endTime = this.toDate(dto.endTime ?? existing?.endTime);
-
-      if (!startTime || !endTime) {
-        throw new BadRequestException(
-          'startTime and endTime are required for once schedules',
-        );
-      }
-
-      if (endTime <= startTime) {
-        throw new BadRequestException('endTime must be after startTime');
-      }
-
-      return {
-        scheduleType,
-        startTime,
-        endTime,
-        durationInMinutes: Math.round(
-          (endTime.getTime() - startTime.getTime()) / (1000 * 60),
-        ),
-        startTimeOfDay: undefined,
-        endTimeOfDay: undefined,
-        daysOfWeek: undefined,
-        timezone,
-        category,
-        description,
-        thumbnailUrl,
-      };
-    }
-
-    const startTimeOfDay =
-      dto.startTimeOfDay ?? existing?.startTimeOfDay ?? undefined;
-    const endTimeOfDay = dto.endTimeOfDay ?? existing?.endTimeOfDay ?? undefined;
-
-    if (!startTimeOfDay || !endTimeOfDay) {
-      throw new BadRequestException(
-        'startTimeOfDay and endTimeOfDay are required for recurring schedules',
-      );
-    }
-
-    const daysOfWeek =
-      scheduleType === ProgramScheduleType.WEEKLY
-        ? (dto.daysOfWeek ?? existing?.daysOfWeek ?? [])
-        : undefined;
-
-    if (
-      scheduleType === ProgramScheduleType.WEEKLY &&
-      (!daysOfWeek || daysOfWeek.length === 0)
-    ) {
-      throw new BadRequestException(
-        'daysOfWeek must be provided for weekly schedules',
-      );
-    }
-
-    const effectiveReferenceDate =
-      this.toDate(dto.startTime ?? existing?.startTime) ?? new Date();
-    const resolvedStartTime = this.dateFromTimeOfDay(
-      startTimeOfDay,
-      effectiveReferenceDate,
-    );
-    const fallbackEndTime = this.dateFromTimeOfDay(
-      endTimeOfDay,
-      effectiveReferenceDate,
-    );
-    if (fallbackEndTime <= resolvedStartTime) {
-      fallbackEndTime.setUTCDate(fallbackEndTime.getUTCDate() + 1);
-    }
-    const effectiveEnd =
-      this.toDate(dto.endTime ?? existing?.endTime) ?? fallbackEndTime;
-
-    return {
-      scheduleType,
-      startTimeOfDay,
-      endTimeOfDay,
-      daysOfWeek,
-      startTime: resolvedStartTime,
-      endTime: effectiveEnd,
-      durationInMinutes: this.durationFromTimes(startTimeOfDay, endTimeOfDay),
-      timezone,
-      category,
-      description,
-      thumbnailUrl,
-    };
-  }
-
   async create(dto: CreateProgramDto): Promise<ProgramDocument> {
-    const normalized = this.normalizeProgramData(dto);
     const program = new this.programModel({
-      title: dto.title,
       channelId: dto.channelId,
+      title: dto.title,
+      description: dto.description,
+      category: dto.category,
+      thumbnailUrl: dto.thumbnailUrl,
+      announcementType: dto.announcementType,
       isActive: true,
-      ...normalized,
     });
 
     const saved = await program.save();
 
     if (saved.isActive) {
+      const prefix =
+        ANNOUNCEMENT_PREFIX_MAP[saved.announcementType] ?? 'New Program';
       await this.notificationsService.notifyNewProgram({
         channelId: saved.channelId.toString(),
         programId: saved._id.toString(),
         programTitle: saved.title,
-        startTime: saved.startTime.toISOString(),
+        announcementPrefix: prefix,
       });
     }
 
@@ -181,10 +67,9 @@ export class AdminProgramsService {
     const {
       page = 1,
       limit = 10,
-      sortBy = 'startTime',
-      sortOrder = 'asc',
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
       search,
-      scheduleType,
     } = params;
 
     const safePage = Math.max(1, Number(page) || 1);
@@ -192,9 +77,6 @@ export class AdminProgramsService {
     const skip = (safePage - 1) * safeLimit;
 
     const filter: Record<string, unknown> = {};
-    if (scheduleType) {
-      filter.scheduleType = scheduleType;
-    }
     if (search?.trim()) {
       const value = search.trim();
       filter.$or = [
@@ -204,13 +86,12 @@ export class AdminProgramsService {
     }
 
     const allowedSortFields = new Set([
-      'startTime',
       'createdAt',
       'updatedAt',
       'title',
-      'scheduleType',
+      'announcementType',
     ]);
-    const resolvedSortBy = allowedSortFields.has(sortBy) ? sortBy : 'startTime';
+    const resolvedSortBy = allowedSortFields.has(sortBy) ? sortBy : 'createdAt';
     const resolvedSortOrder = sortOrder === 'desc' ? -1 : 1;
 
     const [programs, total] = await Promise.all([
@@ -248,11 +129,12 @@ export class AdminProgramsService {
       throw new NotFoundException('Program not found');
     }
 
-    const normalized = this.normalizeProgramData(dto, existing);
-    const updateData: Record<string, unknown> = {
-      ...normalized,
-      title: dto.title ?? existing.title,
-    };
+    const updateData: Record<string, unknown> = {};
+    if (dto.title !== undefined) updateData.title = dto.title;
+    if (dto.description !== undefined) updateData.description = dto.description;
+    if (dto.category !== undefined) updateData.category = dto.category;
+    if (dto.thumbnailUrl !== undefined) updateData.thumbnailUrl = dto.thumbnailUrl;
+    if (dto.announcementType !== undefined) updateData.announcementType = dto.announcementType;
 
     const program = await this.programModel.findByIdAndUpdate(id, updateData, {
       new: true,

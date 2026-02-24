@@ -7,6 +7,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Channel, ChannelDocument } from './schemas/channel.schema';
 import { Program, ProgramDocument } from './schemas/program.schema';
+import { Schedule, ScheduleDocument, ScheduleTargetType } from './schemas/schedule.schema';
 import {
   LiveStream,
   LiveStreamDocument,
@@ -21,6 +22,7 @@ import {
   ChannelSubscription,
   ChannelSubscriptionDocument,
 } from '../notifications/schemas/channel-subscription.schema';
+import { resolveScheduleWindow } from './utils/schedule-utils';
 import type {
   ChannelDetailsDto,
   ChannelDetailsResponseDto,
@@ -37,6 +39,8 @@ export class ChannelsService {
     private readonly channelModel: Model<ChannelDocument>,
     @InjectModel(Program.name)
     private readonly programModel: Model<ProgramDocument>,
+    @InjectModel(Schedule.name)
+    private readonly scheduleModel: Model<ScheduleDocument>,
     @InjectModel(LiveStream.name)
     private readonly liveStreamModel: Model<LiveStreamDocument>,
     @InjectModel(Video.name)
@@ -97,42 +101,6 @@ export class ChannelsService {
     };
   }
 
-  private resolveProgramWindow(
-    program: ProgramDocument,
-    referenceDate = new Date(),
-  ): { startTime: Date; endTime: Date } | null {
-    if (!program.startTimeOfDay || !program.endTimeOfDay) {
-      const startTime = new Date(program.startTime);
-      const endTime = new Date(program.endTime);
-      if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
-        return null;
-      }
-      return { startTime, endTime };
-    }
-
-    if (
-      program.scheduleType === 'weekly' &&
-      program.daysOfWeek?.length &&
-      !program.daysOfWeek.includes(referenceDate.getUTCDay())
-    ) {
-      return null;
-    }
-
-    const [startHours, startMinutes] = program.startTimeOfDay.split(':').map(Number);
-    const [endHours, endMinutes] = program.endTimeOfDay.split(':').map(Number);
-
-    const startTime = new Date(referenceDate);
-    startTime.setUTCHours(startHours, startMinutes, 0, 0);
-
-    const endTime = new Date(referenceDate);
-    endTime.setUTCHours(endHours, endMinutes, 0, 0);
-    if (endTime <= startTime) {
-      endTime.setUTCDate(endTime.getUTCDate() + 1);
-    }
-
-    return { startTime, endTime };
-  }
-
   private toChannelDetailsDto(
     channel: ChannelDocument,
     subscriberCount: number,
@@ -176,35 +144,40 @@ export class ChannelsService {
     };
   }
 
-  private toProgramDto(
-    program: ProgramDocument,
+  private scheduleToChannelProgramDto(
+    schedule: ScheduleDocument,
+    program?: ProgramDocument | null,
+    channel?: ChannelDocument | null,
     fallbackLiveStreamId?: string,
     referenceDate?: Date,
   ): ChannelProgramDto {
-    const window = this.resolveProgramWindow(program, referenceDate) ?? {
-      startTime: new Date(program.startTime),
-      endTime: new Date(program.endTime),
+    const window = resolveScheduleWindow(schedule, referenceDate) ?? {
+      startTime: new Date(schedule.startTime),
+      endTime: new Date(schedule.endTime),
     };
 
+    const title = schedule.title || program?.title || channel?.name || 'Untitled';
+    const description = schedule.description || program?.description || '';
+
     return {
-      id: program._id.toString(),
-      title: program.title,
-      description: program.description,
-      scheduleType: program.scheduleType,
-      startTimeOfDay: program.startTimeOfDay,
-      endTimeOfDay: program.endTimeOfDay,
-      daysOfWeek: program.daysOfWeek,
-      timezone: program.timezone,
+      id: schedule._id.toString(),
+      title,
+      description,
+      scheduleType: schedule.scheduleType,
+      startTimeOfDay: schedule.startTimeOfDay,
+      endTimeOfDay: schedule.endTimeOfDay,
+      daysOfWeek: schedule.daysOfWeek,
+      timezone: schedule.timezone,
       startTime: this.toIsoStringSafe(window.startTime),
       endTime: this.toIsoStringSafe(window.endTime),
-      durationInMinutes: program.durationInMinutes,
-      category: program.category,
-      isLive: program.isLive,
-      viewerCount: program.viewerCount || 0,
-      bookmarkCount: program.bookmarkCount || 0,
-      videoId: program.videoId?.toString(),
-      liveStreamId: program.liveStreamId?.toString() || fallbackLiveStreamId,
-      thumbnailUrl: program.thumbnailUrl,
+      durationInMinutes: schedule.durationInMinutes,
+      category: program?.category,
+      isLive: program?.isLive ?? false,
+      viewerCount: program?.viewerCount ?? 0,
+      bookmarkCount: program?.bookmarkCount ?? 0,
+      videoId: program?.videoId?.toString(),
+      liveStreamId: program?.liveStreamId?.toString() || fallbackLiveStreamId,
+      thumbnailUrl: program?.thumbnailUrl,
     };
   }
 
@@ -292,19 +265,35 @@ export class ChannelsService {
       const videoIdCandidates = videoIdsWithoutDuration.flatMap((videoId) =>
         this.buildIdCandidates(videoId),
       );
+      // Check Schedule collection for durationInMinutes
+      const schedules = await this.scheduleModel
+        .find({
+          targetType: ScheduleTargetType.PROGRAM,
+          durationInMinutes: { $gt: 0 },
+        })
+        .select({ targetId: 1, durationInMinutes: 1 })
+        .lean();
+
+      // Also check programs that have videoId
       const programs = await this.programModel
         .find({
           videoId: { $in: videoIdCandidates },
-          durationInMinutes: { $gt: 0 },
         })
-        .select({ videoId: 1, durationInMinutes: 1 })
+        .select({ _id: 1, videoId: 1 })
         .lean();
+
       for (const program of programs) {
-        if (program.videoId && program.durationInMinutes) {
-          programDurationMap.set(
-            String(program.videoId),
-            Math.floor(program.durationInMinutes * 60),
+        if (program.videoId) {
+          // Find schedule for this program
+          const matchingSchedule = schedules.find(
+            (s) => s.targetId.toString() === program._id.toString(),
           );
+          if (matchingSchedule?.durationInMinutes) {
+            programDurationMap.set(
+              String(program.videoId),
+              Math.floor(matchingSchedule.durationInMinutes * 60),
+            );
+          }
         }
       }
     }
@@ -390,39 +379,8 @@ export class ChannelsService {
       this.videoModel.countDocuments(filter),
     ]);
 
-    const videoIdsWithoutDuration = videos
-      .filter((v) => !v.durationSeconds || v.durationSeconds <= 0)
-      .map((v) => v._id);
-    const programDurationMap = new Map<string, number>();
-    if (videoIdsWithoutDuration.length > 0) {
-      const videoIdCandidates = videoIdsWithoutDuration.flatMap((videoId) =>
-        this.buildIdCandidates(videoId),
-      );
-      const programs = await this.programModel
-        .find({
-          videoId: { $in: videoIdCandidates },
-          durationInMinutes: { $gt: 0 },
-        })
-        .select({ videoId: 1, durationInMinutes: 1 })
-        .lean();
-      for (const program of programs) {
-        if (program.videoId && program.durationInMinutes) {
-          programDurationMap.set(
-            String(program.videoId),
-            Math.floor(program.durationInMinutes * 60),
-          );
-        }
-      }
-    }
-
     return {
-      videos: videos.map((v) => {
-        const dto = this.toVideoListItemDto(v);
-        if (!dto.durationSeconds || dto.durationSeconds <= 0) {
-          dto.durationSeconds = programDurationMap.get(dto.id);
-        }
-        return dto;
-      }),
+      videos: videos.map((v) => this.toVideoListItemDto(v)),
       total,
       page: safePage,
       limit: safeLimit,
@@ -444,9 +402,40 @@ export class ChannelsService {
       throw new NotFoundException('Channel not found');
     }
 
-    const query: Record<string, unknown> = {
-      channelId: this.buildChannelIdFilter(channel),
+    const channelIdCandidates = this.buildIdCandidates(channel._id);
+
+    // Find all programs belonging to this channel
+    const channelPrograms = await this.programModel
+      .find({
+        channelId: { $in: channelIdCandidates },
+        isActive: true,
+      })
+      .lean();
+
+    const programIds = channelPrograms.flatMap((p) =>
+      this.buildIdCandidates(p._id),
+    );
+    const programMap = new Map(
+      channelPrograms.map((p) => [p._id.toString(), p]),
+    );
+
+    // Query schedules for channel-targeted OR program-targeted (belonging to this channel)
+    const scheduleQuery: Record<string, unknown> = {
       isActive: true,
+      $or: [
+        {
+          targetType: ScheduleTargetType.CHANNEL,
+          targetId: { $in: channelIdCandidates },
+        },
+        ...(programIds.length > 0
+          ? [
+              {
+                targetType: ScheduleTargetType.PROGRAM,
+                targetId: { $in: programIds },
+              },
+            ]
+          : []),
+      ],
     };
 
     if (date) {
@@ -460,30 +449,53 @@ export class ChannelsService {
 
       const endOfDay = new Date(parsed);
       endOfDay.setHours(23, 59, 59, 999);
-      query.$or = [
-        { scheduleType: 'daily' },
-        { scheduleType: 'weekly', daysOfWeek: parsed.getUTCDay() },
+
+      // Add date filtering for schedule types
+      (scheduleQuery as any).$and = [
+        (scheduleQuery as any).$or ? { $or: (scheduleQuery as any).$or } : {},
         {
           $or: [
-            { scheduleType: 'once' },
-            { scheduleType: { $exists: false } },
+            { scheduleType: 'daily' },
+            { scheduleType: 'weekly', daysOfWeek: parsed.getUTCDay() },
+            {
+              $or: [
+                { scheduleType: 'once' },
+                { scheduleType: { $exists: false } },
+              ],
+              startTime: { $gte: startOfDay, $lte: endOfDay },
+            },
           ],
-          startTime: { $gte: startOfDay, $lte: endOfDay },
         },
       ];
+      delete (scheduleQuery as any).$or;
     }
 
     const safeLimit = Math.max(1, Math.min(200, Number(limit) || 50));
 
-    const programs = await this.programModel
-      .find(query)
+    const schedules = await this.scheduleModel
+      .find(scheduleQuery)
       .sort({ startTime: 1 })
       .limit(safeLimit);
+
     const defaultLiveStreamId =
       await this.resolveChannelDefaultLiveStreamId(channel);
 
     const refDate = date ? new Date(date) : undefined;
-    return programs.map((p) => this.toProgramDto(p, defaultLiveStreamId, refDate));
+
+    return schedules.map((s) => {
+      const program =
+        s.targetType === ScheduleTargetType.PROGRAM
+          ? (programMap.get(s.targetId.toString()) as ProgramDocument | undefined) ?? null
+          : null;
+
+      return this.scheduleToChannelProgramDto(
+        s,
+        program,
+        channel,
+        defaultLiveStreamId,
+        refDate,
+      );
+    });
   }
 
   async getChannelLivestreamsBySlug(

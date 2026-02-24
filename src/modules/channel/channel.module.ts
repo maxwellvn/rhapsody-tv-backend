@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Channel, ChannelSchema } from './schemas/channel.schema';
 import { Program, ProgramSchema } from './schemas/program.schema';
+import { Schedule, ScheduleSchema } from './schemas/schedule.schema';
 import {
   ProgramSubscription,
   ProgramSubscriptionSchema,
@@ -22,6 +23,7 @@ import { ProgramSubscriptionsService } from './program-subscriptions.service';
     MongooseModule.forFeature([
       { name: Channel.name, schema: ChannelSchema },
       { name: Program.name, schema: ProgramSchema },
+      { name: Schedule.name, schema: ScheduleSchema },
       { name: ProgramSubscription.name, schema: ProgramSubscriptionSchema },
       { name: Video.name, schema: VideoSchema },
       { name: LiveStream.name, schema: LiveStreamSchema },
