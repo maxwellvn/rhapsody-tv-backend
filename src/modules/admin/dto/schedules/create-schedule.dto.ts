@@ -90,7 +90,7 @@ export class CreateScheduleDto {
   endTime?: string;
 
   @ApiPropertyOptional({
-    example: 'UTC',
+    example: 'Africa/Lagos',
     description: 'Timezone for recurring schedules',
   })
   @IsOptional()

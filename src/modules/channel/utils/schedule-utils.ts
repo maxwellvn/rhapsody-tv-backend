@@ -1,6 +1,28 @@
 import { BadRequestException } from '@nestjs/common';
 import { ScheduleDocument, ScheduleType } from '../schemas/schedule.schema';
 
+/** Default timezone for the application (WAT = UTC+1) */
+const DEFAULT_TIMEZONE = 'Africa/Lagos';
+
+/** Known timezone offsets in minutes from UTC */
+const TIMEZONE_OFFSETS: Record<string, number> = {
+  'UTC': 0,
+  'Africa/Lagos': 60,       // WAT  (UTC+1)
+  'America/New_York': -300,  // EST  (UTC-5)
+  'America/Chicago': -360,   // CST  (UTC-6)
+  'America/Denver': -420,    // MST  (UTC-7)
+  'America/Los_Angeles': -480, // PST (UTC-8)
+  'Europe/London': 0,        // GMT  (UTC+0)
+  'Europe/Paris': 60,        // CET  (UTC+1)
+  'Asia/Tokyo': 540,         // JST  (UTC+9)
+};
+
+/** Get UTC offset in minutes for a timezone string. Defaults to WAT (+60). */
+function getTimezoneOffsetMinutes(timezone?: string): number {
+  if (!timezone) return TIMEZONE_OFFSETS[DEFAULT_TIMEZONE];
+  return TIMEZONE_OFFSETS[timezone] ?? TIMEZONE_OFFSETS[DEFAULT_TIMEZONE];
+}
+
 export function toDate(value?: string | Date): Date | undefined {
   if (!value) return undefined;
   const parsed = value instanceof Date ? value : new Date(value);
@@ -19,10 +41,20 @@ export function durationFromTimes(
   return end > start ? end - start : 24 * 60 - start + end;
 }
 
-export function dateFromTimeOfDay(timeOfDay: string, base: Date): Date {
+/**
+ * Convert HH:mm in the given timezone to a UTC Date based on a reference date.
+ */
+export function dateFromTimeOfDay(
+  timeOfDay: string,
+  base: Date,
+  timezone?: string,
+): Date {
   const [hours, minutes] = timeOfDay.split(':').map(Number);
+  const offset = getTimezoneOffsetMinutes(timezone);
   const date = new Date(base);
+  // Convert local time to UTC: subtract the offset
   date.setUTCHours(hours, minutes, 0, 0);
+  date.setUTCMinutes(date.getUTCMinutes() - offset);
   return date;
 }
 
@@ -51,7 +83,7 @@ export function normalizeScheduleData(
   const scheduleType =
     dto.scheduleType ?? existing?.scheduleType ?? ScheduleType.ONCE;
 
-  const timezone = dto.timezone ?? existing?.timezone ?? 'UTC';
+  const timezone = dto.timezone ?? existing?.timezone ?? DEFAULT_TIMEZONE;
 
   if (scheduleType === ScheduleType.ONCE) {
     const startTime = toDate(dto.startTime ?? existing?.startTime);
@@ -122,6 +154,10 @@ export function normalizeScheduleData(
   };
 }
 
+/**
+ * Resolve the actual UTC time window for a schedule on a given reference date.
+ * Time-of-day fields are interpreted in the schedule's timezone (default WAT).
+ */
 export function resolveScheduleWindow(
   schedule: ScheduleDocument,
   referenceDate = new Date(),
@@ -136,7 +172,7 @@ export function resolveScheduleWindow(
       }
       return { startTime, endTime };
     }
-    // No dates at all - lifetime schedule, resolve to reference date
+    // No dates at all - lifetime schedule
     return null;
   }
 
@@ -148,6 +184,8 @@ export function resolveScheduleWindow(
     return null;
   }
 
+  const offset = getTimezoneOffsetMinutes(schedule.timezone);
+
   const [startHours, startMinutes] = schedule.startTimeOfDay
     .split(':')
     .map(Number);
@@ -155,11 +193,15 @@ export function resolveScheduleWindow(
     .split(':')
     .map(Number);
 
+  // Convert local time to UTC by subtracting the offset
   const startTime = new Date(referenceDate);
   startTime.setUTCHours(startHours, startMinutes, 0, 0);
+  startTime.setUTCMinutes(startTime.getUTCMinutes() - offset);
 
   const endTime = new Date(referenceDate);
   endTime.setUTCHours(endHours, endMinutes, 0, 0);
+  endTime.setUTCMinutes(endTime.getUTCMinutes() - offset);
+
   if (endTime <= startTime) {
     endTime.setUTCDate(endTime.getUTCDate() + 1);
   }

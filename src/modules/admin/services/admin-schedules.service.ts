@@ -71,9 +71,51 @@ export class AdminSchedulesService {
     return schedule.save();
   }
 
+  private async populateTargetNames(
+    schedules: ScheduleDocument[],
+  ): Promise<(ScheduleDocument & { targetName?: string })[]> {
+    const channelIds = schedules
+      .filter((s) => s.targetType === ScheduleTargetType.CHANNEL)
+      .map((s) => s.targetId);
+    const programIds = schedules
+      .filter((s) => s.targetType === ScheduleTargetType.PROGRAM)
+      .map((s) => s.targetId);
+
+    const [channels, programs] = await Promise.all([
+      channelIds.length
+        ? this.channelModel
+            .find({ _id: { $in: channelIds } })
+            .select('_id name')
+            .lean()
+        : [],
+      programIds.length
+        ? this.programModel
+            .find({ _id: { $in: programIds } })
+            .select('_id title')
+            .lean()
+        : [],
+    ]);
+
+    const channelMap = new Map(
+      channels.map((c) => [String(c._id), c.name]),
+    );
+    const programMap = new Map(
+      programs.map((p) => [String(p._id), p.title]),
+    );
+
+    return schedules.map((s) => {
+      const obj = s.toObject({ virtuals: true });
+      obj.targetName =
+        s.targetType === ScheduleTargetType.CHANNEL
+          ? channelMap.get(String(s.targetId))
+          : programMap.get(String(s.targetId));
+      return obj;
+    });
+  }
+
   async findAll(
     params: ScheduleListParams = {},
-  ): Promise<{ schedules: ScheduleDocument[]; total: number; pages: number }> {
+  ): Promise<{ schedules: any[]; total: number; pages: number }> {
     const {
       page = 1,
       limit = 10,
@@ -122,21 +164,24 @@ export class AdminSchedulesService {
       this.scheduleModel.countDocuments(filter),
     ]);
 
+    const enriched = await this.populateTargetNames(schedules);
+
     return {
-      schedules,
+      schedules: enriched,
       total,
       pages: Math.ceil(total / safeLimit),
     };
   }
 
-  async findById(id: string): Promise<ScheduleDocument> {
+  async findById(id: string): Promise<any> {
     const schedule = await this.scheduleModel.findById(id);
 
     if (!schedule) {
       throw new NotFoundException('Schedule not found');
     }
 
-    return schedule;
+    const [enriched] = await this.populateTargetNames([schedule]);
+    return enriched;
   }
 
   async update(

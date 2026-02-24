@@ -230,7 +230,7 @@ async function seed() {
     startTimeOfDay: '06:00',
     endTimeOfDay: '07:00',
     durationInMinutes: 60,
-    timezone: 'UTC',
+    timezone: 'Africa/Lagos',
     isActive: true,
   });
 
@@ -243,7 +243,7 @@ async function seed() {
     endTimeOfDay: '09:00',
     daysOfWeek: [1, 3, 5], // Mon, Wed, Fri
     durationInMinutes: 60,
-    timezone: 'UTC',
+    timezone: 'Africa/Lagos',
     isActive: true,
   });
 
@@ -255,7 +255,7 @@ async function seed() {
     startTime: new Date(now.getTime() + 5 * 60 * 60000),
     endTime: new Date(now.getTime() + 7 * 60 * 60000),
     durationInMinutes: 120,
-    timezone: 'UTC',
+    timezone: 'Africa/Lagos',
     isActive: true,
   });
 
@@ -268,7 +268,7 @@ async function seed() {
     endTimeOfDay: '23:59',
     title: '24/7 Broadcast',
     description: 'Round-the-clock programming on Rhapsody TV.',
-    timezone: 'UTC',
+    timezone: 'Africa/Lagos',
     isActive: true,
   });
 

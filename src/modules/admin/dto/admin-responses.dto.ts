@@ -220,7 +220,7 @@ export class ScheduleResponseDto {
   @ApiPropertyOptional({ example: 60 })
   durationInMinutes?: number;
 
-  @ApiPropertyOptional({ example: 'UTC' })
+  @ApiPropertyOptional({ example: 'Africa/Lagos' })
   timezone?: string;
 
   @ApiPropertyOptional({ example: 'Morning Broadcast' })

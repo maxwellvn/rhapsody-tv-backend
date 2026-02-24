@@ -51,7 +51,7 @@ export class Schedule {
   @Prop()
   durationInMinutes?: number;
 
-  @Prop({ trim: true, default: 'UTC' })
+  @Prop({ trim: true, default: 'Africa/Lagos' })
   timezone?: string;
 
   @Prop({ default: true })
