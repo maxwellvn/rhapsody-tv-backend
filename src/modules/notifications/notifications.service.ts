@@ -10,6 +10,7 @@ import {
 } from './schemas';
 import { Channel, ChannelDocument } from '../channel/schemas/channel.schema';
 import { Program, ProgramDocument } from '../channel/schemas/program.schema';
+import { Schedule, ScheduleDocument, ScheduleTargetType } from '../channel/schemas/schedule.schema';
 import { Video, VideoDocument } from '../stream/schemas/video.schema';
 import { LiveStream, LiveStreamDocument } from '../stream/schemas/live-stream.schema';
 
@@ -28,6 +29,8 @@ export class NotificationsService {
     private readonly videoModel: Model<VideoDocument>,
     @InjectModel(LiveStream.name)
     private readonly liveStreamModel: Model<LiveStreamDocument>,
+    @InjectModel(Schedule.name)
+    private readonly scheduleModel: Model<ScheduleDocument>,
   ) {}
 
   async createNotification(params: {
@@ -219,6 +222,58 @@ export class NotificationsService {
         programId: params.programId,
         avatarUrl: program?.thumbnailUrl || channel.avatarUrl,
         thumbnailUrl: program?.thumbnailUrl || channel.coverImageUrl,
+      },
+    });
+  }
+
+  async notifyNewSchedule(params: {
+    scheduleId: string;
+    targetType: ScheduleTargetType;
+    targetId: string;
+    scheduleTitle?: string;
+  }) {
+    let channelId: string;
+    let targetName: string;
+    let avatarUrl: string | undefined;
+    let thumbnailUrl: string | undefined;
+
+    if (params.targetType === ScheduleTargetType.CHANNEL) {
+      channelId = params.targetId;
+      const channel = await this.channelModel
+        .findById(params.targetId)
+        .select('name logoUrl coverImageUrl')
+        .lean();
+      targetName = channel?.name || 'Unknown Channel';
+      avatarUrl = channel?.logoUrl;
+      thumbnailUrl = channel?.coverImageUrl;
+    } else {
+      const program = await this.programModel
+        .findById(params.targetId)
+        .select('channelId title thumbnailUrl')
+        .lean();
+      if (!program) return { count: 0 };
+      channelId = String(program.channelId);
+      targetName = program.title;
+      const channel = await this.buildChannelContext(channelId);
+      avatarUrl = program.thumbnailUrl || channel.avatarUrl;
+      thumbnailUrl = program.thumbnailUrl || channel.coverImageUrl;
+    }
+
+    const title = params.scheduleTitle || targetName;
+    const channel = await this.buildChannelContext(channelId);
+
+    return this.notifyChannelSubscribers({
+      channelId,
+      type: NotificationType.CHANNEL_NEW_SCHEDULE,
+      preferenceKey: 'notifyOnNewProgram',
+      title: `New Schedule: ${title}`,
+      body: `${channel.name} has a new schedule`,
+      data: {
+        channelId,
+        channelSlug: channel.slug,
+        scheduleId: params.scheduleId,
+        avatarUrl,
+        thumbnailUrl,
       },
     });
   }

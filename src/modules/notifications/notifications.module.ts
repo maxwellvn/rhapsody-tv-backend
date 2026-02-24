@@ -11,6 +11,7 @@ import { NotificationsController } from './notifications.controller';
 import { SubscriptionsController } from './subscriptions.controller';
 import { Channel, ChannelSchema } from '../channel/schemas/channel.schema';
 import { Program, ProgramSchema } from '../channel/schemas/program.schema';
+import { Schedule, ScheduleSchema } from '../channel/schemas/schedule.schema';
 import { Video, VideoSchema } from '../stream/schemas/video.schema';
 import { LiveStream, LiveStreamSchema } from '../stream/schemas/live-stream.schema';
 
@@ -23,6 +24,7 @@ import { LiveStream, LiveStreamSchema } from '../stream/schemas/live-stream.sche
       { name: Program.name, schema: ProgramSchema },
       { name: Video.name, schema: VideoSchema },
       { name: LiveStream.name, schema: LiveStreamSchema },
+      { name: Schedule.name, schema: ScheduleSchema },
     ]),
   ],
   controllers: [NotificationsController, SubscriptionsController],

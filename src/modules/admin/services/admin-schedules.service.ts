@@ -15,6 +15,7 @@ import { Channel, ChannelDocument } from '../../channel/schemas/channel.schema';
 import { Program, ProgramDocument } from '../../channel/schemas/program.schema';
 import { CreateScheduleDto, UpdateScheduleDto } from '../dto/schedules';
 import { normalizeScheduleData } from '../../channel/utils/schedule-utils';
+import { NotificationsService } from '../../notifications/notifications.service';
 
 type ScheduleListParams = {
   page?: number;
@@ -35,6 +36,7 @@ export class AdminSchedulesService {
     private readonly channelModel: Model<ChannelDocument>,
     @InjectModel(Program.name)
     private readonly programModel: Model<ProgramDocument>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private async validateTarget(
@@ -68,7 +70,21 @@ export class AdminSchedulesService {
       ...normalized,
     });
 
-    return schedule.save();
+    const saved = await schedule.save();
+
+    // Notify channel subscribers about the new schedule
+    this.notificationsService
+      .notifyNewSchedule({
+        scheduleId: saved._id.toString(),
+        targetType: dto.targetType,
+        targetId: dto.targetId,
+        scheduleTitle: dto.title,
+      })
+      .catch(() => {
+        // Notification failure should not block schedule creation
+      });
+
+    return saved;
   }
 
   private async populateTargetNames(

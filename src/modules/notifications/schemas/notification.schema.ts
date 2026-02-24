@@ -7,6 +7,7 @@ export enum NotificationType {
   CHANNEL_NEW_VIDEO = 'channel_new_video',
   CHANNEL_GO_LIVE = 'channel_go_live',
   CHANNEL_NEW_PROGRAM = 'channel_new_program',
+  CHANNEL_NEW_SCHEDULE = 'channel_new_schedule',
   COMMENT_LIKED = 'comment_liked',
   COMMENT_REPLIED = 'comment_replied',
   ANNOUNCEMENT = 'announcement',
