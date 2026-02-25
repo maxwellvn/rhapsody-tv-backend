@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Video, VideoSchema } from '../stream/schemas/video.schema';
 import { Channel, ChannelSchema } from '../channel/schemas/channel.schema';
+import { Program, ProgramSchema } from '../channel/schemas/program.schema';
 import { VideoLike, VideoLikeSchema } from './schemas/video-like.schema';
 import {
   VideoComment,
@@ -18,6 +19,7 @@ import { NotificationsModule } from '../notifications';
     MongooseModule.forFeature([
       { name: Video.name, schema: VideoSchema },
       { name: Channel.name, schema: ChannelSchema },
+      { name: Program.name, schema: ProgramSchema },
       { name: VideoLike.name, schema: VideoLikeSchema },
       { name: VideoComment.name, schema: VideoCommentSchema },
       { name: CommentLike.name, schema: CommentLikeSchema },

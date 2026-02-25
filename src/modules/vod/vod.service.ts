@@ -48,6 +48,7 @@ export class VodService {
         .skip(skip)
         .limit(limit)
         .populate('channelId', 'name slug logoUrl')
+        .populate('programId', 'title')
         .exec(),
       this.videoModel.countDocuments({ isActive: true, visibility: 'public' }),
     ]);
@@ -76,6 +77,7 @@ export class VodService {
         { new: true },
       )
       .populate('channelId', 'name slug logoUrl')
+      .populate('programId', 'title')
       .exec();
 
     if (!video) {
@@ -407,9 +409,13 @@ export class VodService {
    */
   private formatVideoResponse(video: VideoDocument) {
     const channelData = video.channelId as unknown as ChannelDocument;
+    const programData = video.programId as unknown as
+      | { _id: Types.ObjectId; title: string }
+      | undefined;
     return {
       id: video._id.toString(),
       channelId: channelData?._id?.toString() || video.channelId.toString(),
+      programId: programData?._id?.toString() || (video.programId as unknown as string)?.toString() || undefined,
       channelSlug: channelData?.slug,
       title: video.title,
       description: video.description,
@@ -429,6 +435,12 @@ export class VodService {
             name: channelData.name,
             slug: channelData.slug,
             logoUrl: channelData.logoUrl,
+          }
+        : undefined,
+      program: programData?._id
+        ? {
+            id: programData._id.toString(),
+            title: programData.title,
           }
         : undefined,
     };
