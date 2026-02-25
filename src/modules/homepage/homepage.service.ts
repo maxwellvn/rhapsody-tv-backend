@@ -76,6 +76,14 @@ export class HomepageService {
       : undefined;
   }
 
+  private resolvePopulatedProgram(
+    value: unknown,
+  ): (ProgramDocument & { title: string }) | undefined {
+    return value && typeof value === 'object' && 'title' in value
+      ? (value as ProgramDocument & { title: string })
+      : undefined;
+  }
+
   private toLivestreamProgramDto(
     livestream: LiveStreamDocument,
     isDefaultForChannel = false,
@@ -132,10 +140,13 @@ export class HomepageService {
   toVideoDto(video: VideoDocument): HomepageVideoDto {
     const channelValue = (video as unknown as { channelId?: unknown })
       .channelId;
+    const programValue = (video as unknown as { programId?: unknown })
+      .programId;
     const populatedChannel =
       channelValue && typeof channelValue === 'object' && 'name' in channelValue
         ? (channelValue as ChannelDocument)
         : undefined;
+    const populatedProgram = this.resolvePopulatedProgram(programValue);
 
     return {
       id: video._id.toString(),
@@ -148,6 +159,12 @@ export class HomepageService {
       featuredOrder: video.featuredOrder,
       channel: populatedChannel
         ? this.toChannelDto(populatedChannel)
+        : undefined,
+      program: populatedProgram
+        ? {
+            id: populatedProgram._id.toString(),
+            title: populatedProgram.title,
+          }
         : undefined,
     };
   }
@@ -190,6 +207,7 @@ export class HomepageService {
     const videos = await this.videoModel
       .find({ _id: { $in: videoIds }, isActive: true })
       .populate('channelId', 'name slug logoUrl coverImageUrl')
+      .populate('programId', 'title')
       .lean();
 
     const videoMap = new Map(videos.map((v) => [v._id.toString(), v]));
@@ -368,8 +386,44 @@ export class HomepageService {
       })
       .limit(safeLimit)
       .populate('channelId', 'name slug logoUrl coverImageUrl')
+      .populate('programId', 'title')
       .sort({ featuredOrder: 1, publishedAt: -1, createdAt: -1 });
-    return videos.map((v) => this.toVideoDto(v));
+
+    const missingProgramVideoIds = videos
+      .filter((video) => !(video as unknown as { programId?: unknown }).programId)
+      .map((video) => video._id);
+
+    const reverseProgramMap = new Map<string, { id: string; title: string }>();
+
+    if (missingProgramVideoIds.length > 0) {
+      const linkedPrograms = await this.programModel
+        .find({
+          isActive: true,
+          videoId: { $in: missingProgramVideoIds },
+        })
+        .select('_id title videoId')
+        .lean();
+
+      for (const program of linkedPrograms) {
+        const videoId = (program as { videoId?: Types.ObjectId | string }).videoId;
+        if (!videoId) continue;
+        reverseProgramMap.set(String(videoId), {
+          id: String((program as { _id: Types.ObjectId | string })._id),
+          title: String((program as { title?: string }).title ?? ''),
+        });
+      }
+    }
+
+    return videos.map((v) => {
+      const dto = this.toVideoDto(v);
+      if (!dto.program) {
+        const reverseProgram = reverseProgramMap.get(v._id.toString());
+        if (reverseProgram?.title) {
+          dto.program = reverseProgram;
+        }
+      }
+      return dto;
+    });
   }
 
   async getProgramHighlights(limit = 10): Promise<HomepageVideoDto[]> {
@@ -381,6 +435,7 @@ export class HomepageService {
       })
       .limit(safeLimit)
       .populate('channelId', 'name slug logoUrl coverImageUrl')
+      .populate('programId', 'title')
       .sort({ viewCount: -1, publishedAt: -1, createdAt: -1 });
     return videos.map((v) => this.toVideoDto(v));
   }

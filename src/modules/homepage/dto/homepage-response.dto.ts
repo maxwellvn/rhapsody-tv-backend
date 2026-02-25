@@ -93,6 +93,14 @@ export class HomepageProgramDto {
 
 export class HomepageLivestreamDto extends HomepageProgramDto {}
 
+export class HomepageVideoProgramDto {
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  id: string;
+
+  @ApiProperty({ example: 'This Morning With Rhapsody of Realities' })
+  title: string;
+}
+
 export class HomepageVideoDto {
   @ApiProperty({ example: '507f1f77bcf86cd799439011' })
   id: string;
@@ -120,6 +128,9 @@ export class HomepageVideoDto {
 
   @ApiPropertyOptional({ type: HomepageChannelDto })
   channel?: HomepageChannelDto;
+
+  @ApiPropertyOptional({ type: HomepageVideoProgramDto })
+  program?: HomepageVideoProgramDto;
 }
 
 export class HomepageContinueWatchingDto {
