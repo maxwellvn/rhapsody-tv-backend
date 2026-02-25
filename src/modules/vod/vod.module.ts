@@ -9,6 +9,7 @@ import {
   VideoCommentSchema,
 } from './schemas/video-comment.schema';
 import { CommentLike, CommentLikeSchema } from './schemas/comment-like.schema';
+import { VideoView, VideoViewSchema } from './schemas/video-view.schema';
 import { VodController } from './vod.controller';
 import { VodService } from './vod.service';
 import { NotificationsModule } from '../notifications';
@@ -23,6 +24,7 @@ import { NotificationsModule } from '../notifications';
       { name: VideoLike.name, schema: VideoLikeSchema },
       { name: VideoComment.name, schema: VideoCommentSchema },
       { name: CommentLike.name, schema: CommentLikeSchema },
+      { name: VideoView.name, schema: VideoViewSchema },
     ]),
   ],
   controllers: [VodController],

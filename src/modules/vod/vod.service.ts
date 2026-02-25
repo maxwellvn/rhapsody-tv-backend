@@ -7,6 +7,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Video, VideoDocument } from '../stream/schemas/video.schema';
 import { VideoLike, VideoLikeDocument } from './schemas/video-like.schema';
+import { VideoView, VideoViewDocument } from './schemas/video-view.schema';
 import {
   VideoComment,
   VideoCommentDocument,
@@ -26,6 +27,8 @@ export class VodService {
     private readonly videoModel: Model<VideoDocument>,
     @InjectModel(VideoLike.name)
     private readonly videoLikeModel: Model<VideoLikeDocument>,
+    @InjectModel(VideoView.name)
+    private readonly videoViewModel: Model<VideoViewDocument>,
     @InjectModel(VideoComment.name)
     private readonly videoCommentModel: Model<VideoCommentDocument>,
     @InjectModel(CommentLike.name)
@@ -63,25 +66,43 @@ export class VodService {
   }
 
   /**
-   * Get a single video by ID and increment view count
+   * Get a single video by ID and increment unique user view count (once per user)
    */
-  async getVideoById(videoId: string) {
+  async getVideoById(videoId: string, userId?: string) {
     if (!Types.ObjectId.isValid(videoId)) {
       throw new BadRequestException('Invalid video ID');
     }
 
     const video = await this.videoModel
-      .findOneAndUpdate(
-        { _id: videoId, isActive: true },
-        { $inc: { viewCount: 1 } },
-        { new: true },
-      )
+      .findOne({ _id: videoId, isActive: true })
       .populate('channelId', 'name slug logoUrl')
       .populate('programId', 'title')
       .exec();
 
     if (!video) {
       throw new NotFoundException('Video not found');
+    }
+
+    // Count at most one aggregate view per authenticated user for this video.
+    if (userId && Types.ObjectId.isValid(userId)) {
+      try {
+        await this.videoViewModel.create({
+          userId: new Types.ObjectId(userId),
+          videoId: video._id,
+        });
+
+        await this.videoModel.updateOne(
+          { _id: video._id },
+          { $inc: { viewCount: 1 } },
+        );
+        video.viewCount = (video.viewCount || 0) + 1;
+      } catch (error: unknown) {
+        // Ignore duplicate key errors: the user has already been counted.
+        const code = (error as { code?: number })?.code;
+        if (code !== 11000) {
+          throw error;
+        }
+      }
     }
 
     return this.formatVideoResponse(video);

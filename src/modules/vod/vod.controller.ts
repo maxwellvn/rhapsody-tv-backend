@@ -58,14 +58,17 @@ export class VodController {
   }
 
   @Get(':videoId')
-  @ApiOperation({ summary: 'Get video details and increment view count' })
+  @ApiOperation({ summary: 'Get video details and increment unique user view count' })
   @ApiParam({ name: 'videoId', description: 'Video ID' })
   @ApiOkSuccessResponse({
     description: 'Video retrieved successfully',
     model: VodVideoResponseDto,
   })
-  async getVideoById(@Param('videoId') videoId: string) {
-    const video = await this.vodService.getVideoById(videoId);
+  async getVideoById(
+    @CurrentUser() user: UserDocument | undefined,
+    @Param('videoId') videoId: string,
+  ) {
+    const video = await this.vodService.getVideoById(videoId, user?._id?.toString());
     return {
       success: true,
       message: 'Video retrieved successfully',
