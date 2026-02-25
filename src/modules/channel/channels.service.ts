@@ -126,10 +126,20 @@ export class ChannelsService {
   }
 
   private toVideoListItemDto(video: VideoDocument): ChannelVideoListItemDto {
+    const programValue = (video as unknown as { programId?: unknown }).programId;
+    const populatedProgram =
+      programValue && typeof programValue === 'object' && 'title' in programValue
+        ? (programValue as ProgramDocument)
+        : undefined;
+
     return {
       id: video._id.toString(),
-      programId: (video as VideoDocument & { programId?: Types.ObjectId })
-        .programId?.toString(),
+      programId: populatedProgram
+        ? populatedProgram._id.toString()
+        : (programValue as Types.ObjectId | undefined)?.toString(),
+      program: populatedProgram
+        ? { id: populatedProgram._id.toString(), title: populatedProgram.title }
+        : undefined,
       title: video.title,
       description: video.description,
       playbackUrl: video.playbackUrl,
@@ -251,6 +261,7 @@ export class ChannelsService {
           isActive: true,
           visibility: VideoVisibility.PUBLIC,
         })
+        .populate('programId', 'title')
         .sort({ publishedAt: -1, createdAt: -1 })
         .limit(latestVideosLimit),
       this.subscriptionModel.countDocuments({ channelId: channelIdFilter }),
@@ -374,6 +385,7 @@ export class ChannelsService {
     const [videos, total] = await Promise.all([
       this.videoModel
         .find(filter)
+        .populate('programId', 'title')
         .sort({ publishedAt: -1, createdAt: -1 })
         .skip(skip)
         .limit(safeLimit),

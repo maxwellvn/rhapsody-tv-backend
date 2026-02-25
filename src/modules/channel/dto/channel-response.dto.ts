@@ -35,12 +35,23 @@ export class ChannelDetailsDto {
   joinedAt: string;
 }
 
+export class ChannelVideoListItemProgramDto {
+  @ApiProperty({ description: 'Program ID' })
+  id: string;
+
+  @ApiProperty({ description: 'Program title' })
+  title: string;
+}
+
 export class ChannelVideoListItemDto {
   @ApiProperty({ description: 'Video ID' })
   id: string;
 
   @ApiPropertyOptional({ description: 'Program ID linked to this video' })
   programId?: string;
+
+  @ApiPropertyOptional({ description: 'Program details', type: ChannelVideoListItemProgramDto })
+  program?: ChannelVideoListItemProgramDto;
 
   @ApiProperty({ description: 'Video title' })
   title: string;
