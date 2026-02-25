@@ -23,6 +23,9 @@ export class Video {
   @Prop({ trim: true })
   description?: string;
 
+  @Prop({ trim: true, sparse: true })
+  externalId?: string;
+
   @Prop({ required: true })
   playbackUrl: string;
 
@@ -68,6 +71,7 @@ VideoSchema.index({ programId: 1, createdAt: -1 });
 VideoSchema.index({ visibility: 1, publishedAt: -1 });
 VideoSchema.index({ isActive: 1 });
 VideoSchema.index({ isFeatured: 1, featuredOrder: 1, publishedAt: -1, createdAt: -1 });
+VideoSchema.index({ externalId: 1 }, { unique: true, sparse: true });
 
 // Ensure __v is removed
 VideoSchema.set('toJSON', {

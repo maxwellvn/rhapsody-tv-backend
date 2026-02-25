@@ -33,6 +33,7 @@ import { NotificationsModule } from './modules/notifications';
 import { MailModule } from './modules/mail/mail.module';
 import { VideosModule } from './modules/videos';
 import { DonationsModule } from './modules/donations';
+import { SyncModule } from './modules/sync';
 
 @Module({
   imports: [
@@ -75,6 +76,7 @@ import { DonationsModule } from './modules/donations';
     VodModule,
     MailModule,
     DonationsModule,
+    SyncModule,
   ],
   providers: [
     // Global Exception Filter

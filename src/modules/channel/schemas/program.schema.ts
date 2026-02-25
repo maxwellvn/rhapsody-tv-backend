@@ -15,6 +15,9 @@ export class Program {
   @Prop({ type: Types.ObjectId, ref: 'Channel', required: true, index: true })
   channelId: Types.ObjectId;
 
+  @Prop({ trim: true, sparse: true })
+  externalId?: string;
+
   @Prop({ required: true, trim: true })
   title: string;
 
@@ -58,3 +61,4 @@ export const ProgramSchema = SchemaFactory.createForClass(Program);
 
 ProgramSchema.index({ channelId: 1, isActive: 1 });
 ProgramSchema.index({ isLive: 1 });
+ProgramSchema.index({ externalId: 1 }, { unique: true, sparse: true });
