@@ -31,8 +31,14 @@ export class HomepageController {
   @Public()
   @Get('daily-devotional')
   @ApiOperation({ summary: 'Proxy today\'s Rhapsody of Realities devotional' })
-  async getDailyDevotional() {
-    const data = await this.homepageService.getDailyDevotional();
+  @ApiQuery({
+    name: 'date',
+    required: false,
+    type: String,
+    description: 'Optional devotional date in YYYY-MM-DD. Defaults to WAT date when omitted.',
+  })
+  async getDailyDevotional(@Query('date') date?: string) {
+    const data = await this.homepageService.getDailyDevotional(date);
     return {
       success: true,
       message: 'Daily devotional retrieved successfully',

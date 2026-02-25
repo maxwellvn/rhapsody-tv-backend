@@ -27,6 +27,7 @@ import type {
 @Injectable()
 export class HomepageService {
   private readonly PRIMARY_HOME_CHANNEL_SLUG = 'rhapsody-tv';
+  private readonly ROR_TIMEZONE = 'Africa/Lagos'; // WAT (UTC+1)
 
   // ─── RoR Devotional Token Cache ────────────────────────────────────────────
   private rorToken: string | null = null;
@@ -57,6 +58,50 @@ export class HomepageService {
       }
     }
     return fallback.toISOString();
+  }
+
+  private getRorNowParts(date = new Date()): {
+    year: number;
+    month: number; // 1-12
+    day: number; // 1-31
+  } {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: this.ROR_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date);
+
+    const get = (type: 'year' | 'month' | 'day') =>
+      Number(parts.find((p) => p.type === type)?.value ?? 0);
+
+    return {
+      year: get('year'),
+      month: get('month'),
+      day: get('day'),
+    };
+  }
+
+  private parseYmdParts(
+    value?: string,
+  ): { year: number; month: number; day: number } | null {
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    const [ys, ms, ds] = value.split('-');
+    const year = Number(ys);
+    const month = Number(ms);
+    const day = Number(ds);
+    if (!year || month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+    const check = new Date(Date.UTC(year, month - 1, day));
+    if (
+      check.getUTCFullYear() !== year ||
+      check.getUTCMonth() + 1 !== month ||
+      check.getUTCDate() !== day
+    ) {
+      return null;
+    }
+
+    return { year, month, day };
   }
 
   private toChannelDto(channel: ChannelDocument): HomepageChannelDto {
@@ -770,22 +815,23 @@ export class HomepageService {
     }
   }
 
-  async getDailyDevotional(): Promise<Record<string, unknown> | null> {
+  async getDailyDevotional(dateOverride?: string): Promise<Record<string, unknown> | null> {
     try {
       const token = await this.getRorToken();
       if (!token) return null;
 
       const now = new Date();
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      const d = String(now.getDate()).padStart(2, '0');
+      const selectedDate = this.parseYmdParts(dateOverride) ?? this.getRorNowParts(now);
+      const y = selectedDate.year;
+      const m = String(selectedDate.month).padStart(2, '0');
+      const d = String(selectedDate.day).padStart(2, '0');
       const date = `${y}-${m}-${d}`;
 
       const months = [
         'january', 'february', 'march', 'april', 'may', 'june',
         'july', 'august', 'september', 'october', 'november', 'december',
       ];
-      const audioUrl = `https://roraudio.b-cdn.net/${y}/${months[now.getMonth()]}/${now.getDate()}.mp3`;
+      const audioUrl = `https://roraudio.b-cdn.net/${y}/${months[selectedDate.month - 1]}/${selectedDate.day}.mp3`;
 
       const resp = await fetch(`${this.ROR_BASE}/api/daily-devotional/${date}`, {
         headers: {
