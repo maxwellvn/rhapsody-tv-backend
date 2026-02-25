@@ -29,6 +29,18 @@ export class HomepageController {
   ) {}
 
   @Public()
+  @Get('daily-devotional')
+  @ApiOperation({ summary: 'Proxy today\'s Rhapsody of Realities devotional' })
+  async getDailyDevotional() {
+    const data = await this.homepageService.getDailyDevotional();
+    return {
+      success: true,
+      message: 'Daily devotional retrieved successfully',
+      data,
+    };
+  }
+
+  @Public()
   @Get('live-now')
   @ApiOperation({ summary: 'Get live now program' })
   @ApiOkSuccessResponse({

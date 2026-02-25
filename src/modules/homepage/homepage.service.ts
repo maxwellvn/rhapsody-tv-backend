@@ -28,6 +28,12 @@ import type {
 export class HomepageService {
   private readonly PRIMARY_HOME_CHANNEL_SLUG = 'rhapsody-tv';
 
+  // ─── RoR Devotional Token Cache ────────────────────────────────────────────
+  private rorToken: string | null = null;
+  private rorTokenTs = 0;
+  private readonly ROR_BASE = 'https://read.rhapsodyofrealities.org';
+  private readonly ROR_TOKEN_LIFETIME = 40 * 60 * 1000; // 40 min
+
   constructor(
     @InjectModel(Channel.name)
     private readonly channelModel: Model<ChannelDocument>,
@@ -686,5 +692,63 @@ export class HomepageService {
         programs: scoredPrograms.length,
       },
     };
+  }
+
+  // ─── RoR Daily Devotional Proxy ──────────────────────────────────────────
+
+  private async getRorToken(): Promise<string | null> {
+    if (this.rorToken && Date.now() - this.rorTokenTs < this.ROR_TOKEN_LIFETIME) {
+      return this.rorToken;
+    }
+    try {
+      const resp = await fetch(`${this.ROR_BASE}/`);
+      const setCookie = resp.headers.get('set-cookie') ?? '';
+      const match = setCookie.match(/_read_IPA=([^;]+)/);
+      if (match) {
+        this.rorToken = match[1];
+        this.rorTokenTs = Date.now();
+        return this.rorToken;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  async getDailyDevotional(): Promise<Record<string, unknown> | null> {
+    try {
+      const token = await this.getRorToken();
+      if (!token) return null;
+
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      const date = `${y}-${m}-${d}`;
+
+      const months = [
+        'january', 'february', 'march', 'april', 'may', 'june',
+        'july', 'august', 'september', 'october', 'november', 'december',
+      ];
+      const audioUrl = `https://roraudio.b-cdn.net/${y}/${months[now.getMonth()]}/${now.getDate()}.mp3`;
+
+      const resp = await fetch(`${this.ROR_BASE}/api/daily-devotional/${date}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Referer: `${this.ROR_BASE}/`,
+        },
+      });
+
+      const data = await resp.json() as { result?: Record<string, unknown>[] };
+      const devotional = data?.result?.[0];
+      if (!devotional) return null;
+
+      const body = typeof devotional.body === 'string' ? devotional.body : '';
+      const plainBody = body.replace(/<[^>]+>/g, '').trim();
+
+      return { ...devotional, audioUrl, plainBody };
+    } catch {
+      return null;
+    }
   }
 }
