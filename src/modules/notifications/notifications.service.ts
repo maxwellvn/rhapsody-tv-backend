@@ -124,7 +124,7 @@ export class NotificationsService {
       body: params.body,
       sound: 'default',
       priority: 'high',
-      channelId: 'default',
+      channelId: 'admin-alerts',
       data: {
         ...(params.data || {}),
         type: params.type,
