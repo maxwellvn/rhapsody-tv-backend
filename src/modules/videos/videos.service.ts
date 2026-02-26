@@ -282,6 +282,12 @@ export class VideosService {
 
   private mapVideo(video: SearchVideoDocument) {
     const channel = video.channelId ?? undefined;
+    const program =
+      video.programId &&
+      typeof video.programId === 'object' &&
+      'title' in video.programId
+        ? video.programId
+        : undefined;
 
     return {
       id: video._id.toString(),
@@ -298,6 +304,12 @@ export class VideosService {
       uploadDate: (video.publishedAt ?? video.createdAt)?.toISOString(),
       category: 'general',
       tags: [],
+      program: program
+        ? {
+            id: program._id?.toString?.() ?? '',
+            title: program.title ?? '',
+          }
+        : undefined,
       channel: {
         id: channel?._id?.toString() ?? '',
         name: channel?.name ?? 'Unknown Channel',
@@ -534,6 +546,7 @@ export class VideosService {
         .skip(skip)
         .limit(limit)
         .populate('channelId', 'name logoUrl')
+        .populate('programId', 'title')
         .exec(),
       this.videoModel.countDocuments(filter),
     ]);
