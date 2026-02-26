@@ -541,17 +541,17 @@ export class VideosService {
     let candidates = (await this.videoModel
       .find(candidateFilter)
       .sort({ publishedAt: -1, createdAt: -1 })
-      .limit(300)
+      .limit(120)
       .populate('channelId', 'name logoUrl')
       .populate('programId', 'title')
       .exec()) as unknown as SearchVideoDocument[];
 
     // Broaden the pool when semantic prefilter is sparse.
-    if (candidates.length < 40) {
+    if (candidates.length < 24) {
       const fallback = (await this.videoModel
         .find(baseFilter)
         .sort({ isFeatured: -1, likeCount: -1, viewCount: -1, publishedAt: -1, createdAt: -1 })
-        .limit(250)
+        .limit(120)
         .populate('channelId', 'name logoUrl')
         .populate('programId', 'title')
         .exec()) as unknown as SearchVideoDocument[];
@@ -573,9 +573,15 @@ export class VideosService {
       .filter((entry) => entry.score > 0)
       .sort((a, b) => b.score - a.score);
 
-    const diversified = this.mmrDiversify(ranked);
-    const total = diversified.length;
-    const pageItems = diversified.slice(skip, skip + limit);
+    // Diversify only a top window to keep request latency low under load.
+    const rerankWindow = Math.min(
+      ranked.length,
+      Math.max(skip + limit + 40, 80),
+    );
+    const diversifiedTop = this.mmrDiversify(ranked.slice(0, rerankWindow));
+    const ordered = [...diversifiedTop, ...ranked.slice(rerankWindow)];
+    const total = ordered.length;
+    const pageItems = ordered.slice(skip, skip + limit);
 
     return this.paginated(
       pageItems.map((entry) => this.mapVideo(entry.video)),
