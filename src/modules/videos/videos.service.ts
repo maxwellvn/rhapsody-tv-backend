@@ -535,8 +535,8 @@ export class VideosService {
       orClauses.push({ title: regex }, { description: regex });
     }
 
-    const candidateFilter =
-      orClauses.length > 0 ? ({ ...baseFilter, $or: orClauses } as const) : (baseFilter as const);
+    const candidateFilter: Record<string, unknown> =
+      orClauses.length > 0 ? { ...baseFilter, $or: orClauses } : baseFilter;
 
     let candidates = (await this.videoModel
       .find(candidateFilter)
