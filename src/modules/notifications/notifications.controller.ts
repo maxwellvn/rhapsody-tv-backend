@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Patch, Param, Query, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Patch, Param, Query, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -11,7 +11,12 @@ import { Model, Types } from 'mongoose';
 import { CurrentUser } from '../../common/decorators';
 import { ApiOkSuccessResponse } from '../../common/swagger';
 import { Notification, NotificationDocument } from './schemas';
-import { PaginatedNotificationsDto } from './dto';
+import {
+  PaginatedNotificationsDto,
+  RegisterPushTokenDto,
+  RemovePushTokenDto,
+} from './dto';
+import { NotificationsService } from './notifications.service';
 
 @ApiTags('Notifications')
 @ApiBearerAuth()
@@ -20,6 +25,7 @@ export class NotificationsController {
   constructor(
     @InjectModel(Notification.name)
     private readonly notificationModel: Model<NotificationDocument>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   @Get()
@@ -128,6 +134,43 @@ export class NotificationsController {
     return {
       success: true,
       message: 'Notification deleted',
+    };
+  }
+
+  @Post('push-token')
+  @ApiOperation({ summary: 'Register this device for remote push notifications' })
+  @ApiOkSuccessResponse({ description: 'Push token registered successfully' })
+  async registerPushToken(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: RegisterPushTokenDto,
+  ) {
+    await this.notificationsService.registerPushToken({
+      userId,
+      token: dto.token,
+      platform: dto.platform,
+    });
+
+    return {
+      success: true,
+      message: 'Push token registered successfully',
+    };
+  }
+
+  @Delete('push-token')
+  @ApiOperation({ summary: 'Deactivate a device push token' })
+  @ApiOkSuccessResponse({ description: 'Push token removed successfully' })
+  async removePushToken(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: RemovePushTokenDto,
+  ) {
+    await this.notificationsService.removePushToken({
+      userId,
+      token: dto.token,
+    });
+
+    return {
+      success: true,
+      message: 'Push token removed successfully',
     };
   }
 }

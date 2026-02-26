@@ -5,6 +5,8 @@ import {
   ChannelSubscriptionSchema,
   Notification,
   NotificationSchema,
+  PushDeviceToken,
+  PushDeviceTokenSchema,
 } from './schemas';
 import { NotificationsService } from './notifications.service';
 import { NotificationsController } from './notifications.controller';
@@ -20,6 +22,7 @@ import { LiveStream, LiveStreamSchema } from '../stream/schemas/live-stream.sche
     MongooseModule.forFeature([
       { name: Notification.name, schema: NotificationSchema },
       { name: ChannelSubscription.name, schema: ChannelSubscriptionSchema },
+      { name: PushDeviceToken.name, schema: PushDeviceTokenSchema },
       { name: Channel.name, schema: ChannelSchema },
       { name: Program.name, schema: ProgramSchema },
       { name: Video.name, schema: VideoSchema },

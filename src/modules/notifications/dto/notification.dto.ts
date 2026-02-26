@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { NotificationType } from '../schemas';
 
 export class NotificationDto {
@@ -42,4 +43,32 @@ export class PaginatedNotificationsDto {
 
   @ApiProperty({ example: 3 })
   unreadCount: number;
+}
+
+export class RegisterPushTokenDto {
+  @ApiProperty({
+    example: 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]',
+    description: 'Expo push token for this device/app install',
+  })
+  @IsString()
+  @Matches(/^(Exponent|Expo)PushToken\[[^\]]+\]$/, {
+    message: 'Invalid Expo push token format',
+  })
+  token: string;
+
+  @ApiPropertyOptional({ example: 'android', enum: ['android', 'ios', 'web'] })
+  @IsOptional()
+  @IsString()
+  @IsIn(['android', 'ios', 'web'])
+  platform?: 'android' | 'ios' | 'web';
+}
+
+export class RemovePushTokenDto {
+  @ApiProperty({
+    example: 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]',
+    description: 'Expo push token to deactivate',
+  })
+  @IsString()
+  @MaxLength(200)
+  token: string;
 }

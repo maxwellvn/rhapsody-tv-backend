@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -7,6 +7,8 @@ import {
   Notification,
   NotificationDocument,
   NotificationType,
+  PushDeviceToken,
+  PushDeviceTokenDocument,
 } from './schemas';
 import { Channel, ChannelDocument } from '../channel/schemas/channel.schema';
 import { Program, ProgramDocument } from '../channel/schemas/program.schema';
@@ -16,11 +18,15 @@ import { LiveStream, LiveStreamDocument } from '../stream/schemas/live-stream.sc
 
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+
   constructor(
     @InjectModel(Notification.name)
     private readonly notificationModel: Model<NotificationDocument>,
     @InjectModel(ChannelSubscription.name)
     private readonly subscriptionModel: Model<ChannelSubscriptionDocument>,
+    @InjectModel(PushDeviceToken.name)
+    private readonly pushDeviceTokenModel: Model<PushDeviceTokenDocument>,
     @InjectModel(Channel.name)
     private readonly channelModel: Model<ChannelDocument>,
     @InjectModel(Program.name)
@@ -32,6 +38,154 @@ export class NotificationsService {
     @InjectModel(Schedule.name)
     private readonly scheduleModel: Model<ScheduleDocument>,
   ) {}
+
+  private isExpoPushToken(token: string): boolean {
+    return /^(Exponent|Expo)PushToken\[[^\]]+\]$/.test(token);
+  }
+
+  private uniqStrings(values: string[]): string[] {
+    return [...new Set(values.filter((value) => typeof value === 'string' && value.trim().length > 0))];
+  }
+
+  async registerPushToken(params: {
+    userId: string;
+    token: string;
+    platform?: string;
+  }) {
+    if (!this.isExpoPushToken(params.token)) {
+      return { skipped: true };
+    }
+
+    await this.pushDeviceTokenModel.updateOne(
+      { token: params.token },
+      {
+        $set: {
+          userId: new Types.ObjectId(params.userId),
+          token: params.token,
+          platform: params.platform || 'unknown',
+          isActive: true,
+          lastSeenAt: new Date(),
+        },
+      },
+      { upsert: true },
+    );
+
+    return { skipped: false };
+  }
+
+  async removePushToken(params: { userId: string; token: string }) {
+    await this.pushDeviceTokenModel.updateOne(
+      {
+        userId: new Types.ObjectId(params.userId),
+        token: params.token,
+      },
+      { $set: { isActive: false } },
+    );
+
+    return { success: true };
+  }
+
+  private async deactivatePushTokens(tokens: string[]) {
+    const uniqueTokens = this.uniqStrings(tokens);
+    if (uniqueTokens.length === 0) return;
+
+    await this.pushDeviceTokenModel.updateMany(
+      { token: { $in: uniqueTokens } },
+      { $set: { isActive: false } },
+    );
+  }
+
+  private async sendRemotePushToUsers(params: {
+    userIds: string[];
+    title: string;
+    body: string;
+    type: NotificationType;
+    data?: Record<string, unknown>;
+  }) {
+    const userIds = this.uniqStrings(params.userIds);
+    if (userIds.length === 0) return { sent: 0, tokens: 0 };
+
+    const tokenDocs = await this.pushDeviceTokenModel
+      .find({
+        userId: { $in: userIds.map((id) => new Types.ObjectId(id)) },
+        isActive: true,
+      })
+      .select('token')
+      .lean();
+
+    const tokens = this.uniqStrings(
+      tokenDocs.map((doc) => doc.token).filter((token) => this.isExpoPushToken(token)),
+    );
+    if (tokens.length === 0) return { sent: 0, tokens: 0 };
+
+    const messages = tokens.map((to) => ({
+      to,
+      title: params.title,
+      body: params.body,
+      sound: 'default',
+      priority: 'high',
+      data: {
+        ...(params.data || {}),
+        type: params.type,
+      },
+    }));
+
+    const chunks: typeof messages[] = [];
+    for (let i = 0; i < messages.length; i += 100) {
+      chunks.push(messages.slice(i, i + 100));
+    }
+
+    const invalidTokens: string[] = [];
+
+    for (const chunk of chunks) {
+      try {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        };
+        const expoAccessToken = process.env.EXPO_ACCESS_TOKEN?.trim();
+        if (expoAccessToken) {
+          headers.Authorization = `Bearer ${expoAccessToken}`;
+        }
+
+        const response = await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(chunk),
+        });
+
+        const json = (await response.json().catch(() => null)) as
+          | { data?: Array<{ status?: string; details?: { error?: string } }> }
+          | null;
+
+        if (!response.ok) {
+          this.logger.warn(
+            `Expo push send failed with status ${response.status}`,
+          );
+          continue;
+        }
+
+        const results = Array.isArray(json?.data) ? json!.data! : [];
+        results.forEach((result, index) => {
+          if (
+            result?.status === 'error' &&
+            result?.details?.error === 'DeviceNotRegistered'
+          ) {
+            const token = chunk[index]?.to;
+            if (token) invalidTokens.push(token);
+          }
+        });
+      } catch (error) {
+        this.logger.warn(`Expo push send error: ${String(error)}`);
+      }
+    }
+
+    if (invalidTokens.length > 0) {
+      await this.deactivatePushTokens(invalidTokens);
+    }
+
+    return { sent: messages.length, tokens: tokens.length };
+  }
 
   async createNotification(params: {
     userId: string;
@@ -48,6 +202,14 @@ export class NotificationsService {
       data: params.data,
       isRead: false,
     });
+
+    void this.sendRemotePushToUsers({
+      userIds: [params.userId],
+      title: params.title,
+      body: params.body,
+      type: params.type,
+      data: params.data,
+    }).catch(() => null);
 
     return doc;
   }
@@ -82,6 +244,14 @@ export class NotificationsService {
         isRead: false,
       })),
     );
+
+    void this.sendRemotePushToUsers({
+      userIds: subscriptions.map((s) => s.userId.toString()),
+      title: params.title,
+      body: params.body,
+      type: params.type,
+      data: params.data,
+    }).catch(() => null);
 
     return { count: subscriptions.length };
   }
@@ -350,6 +520,14 @@ export class NotificationsService {
       })),
     );
 
+    void this.sendRemotePushToUsers({
+      userIds: params.userIds,
+      title: params.title,
+      body: params.body,
+      type: NotificationType.CUSTOM,
+      data: params.data,
+    }).catch(() => null);
+
     return { count: params.userIds.length };
   }
 
@@ -505,6 +683,14 @@ export class NotificationsService {
         isRead: false,
       })),
     );
+
+    void this.sendRemotePushToUsers({
+      userIds: params.userIds,
+      title: params.title,
+      body: params.body,
+      type: NotificationType.ANNOUNCEMENT,
+      data: params.data,
+    }).catch(() => null);
 
     return { count: params.userIds.length };
   }
