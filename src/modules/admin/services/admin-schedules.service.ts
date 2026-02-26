@@ -27,6 +27,18 @@ type ScheduleListParams = {
   scheduleType?: ScheduleType;
 };
 
+type NormalizedScheduleDuplicateInput = {
+  targetType: ScheduleTargetType;
+  targetId: string;
+  scheduleType: ScheduleType;
+  startTimeOfDay?: string;
+  endTimeOfDay?: string;
+  daysOfWeek?: number[];
+  startTime?: Date;
+  endTime?: Date;
+  title?: string;
+};
+
 @Injectable()
 export class AdminSchedulesService {
   constructor(
@@ -38,6 +50,97 @@ export class AdminSchedulesService {
     private readonly programModel: Model<ProgramDocument>,
     private readonly notificationsService: NotificationsService,
   ) {}
+
+  private normalizeScheduleName(name?: string | null): string | undefined {
+    const trimmed = name?.trim();
+    if (!trimmed) return undefined;
+    return trimmed.toLowerCase();
+  }
+
+  private normalizeDays(days?: number[]): number[] | undefined {
+    if (!days?.length) return undefined;
+    return [...new Set(days)].sort((a, b) => a - b);
+  }
+
+  private isSameDate(a?: Date, b?: Date): boolean {
+    if (!a && !b) return true;
+    if (!a || !b) return false;
+    return a.getTime() === b.getTime();
+  }
+
+  private sameScheduleTiming(
+    existing: ScheduleDocument,
+    input: NormalizedScheduleDuplicateInput,
+  ): boolean {
+    if (
+      existing.targetType !== input.targetType ||
+      String(existing.targetId) !== String(input.targetId) ||
+      existing.scheduleType !== input.scheduleType
+    ) {
+      return false;
+    }
+
+    if (input.scheduleType === ScheduleType.ONCE) {
+      return (
+        this.isSameDate(existing.startTime, input.startTime) &&
+        this.isSameDate(existing.endTime, input.endTime)
+      );
+    }
+
+    if (
+      (existing.startTimeOfDay || undefined) !== (input.startTimeOfDay || undefined) ||
+      (existing.endTimeOfDay || undefined) !== (input.endTimeOfDay || undefined)
+    ) {
+      return false;
+    }
+
+    if (input.scheduleType === ScheduleType.WEEKLY) {
+      const existingDays = this.normalizeDays(existing.daysOfWeek);
+      const inputDays = this.normalizeDays(input.daysOfWeek);
+      return JSON.stringify(existingDays ?? []) === JSON.stringify(inputDays ?? []);
+    }
+
+    return true;
+  }
+
+  private async assertNoDuplicateSchedule(
+    input: NormalizedScheduleDuplicateInput,
+    excludeId?: string,
+  ): Promise<void> {
+    const baseFilter: Record<string, unknown> = {
+      targetType: input.targetType,
+      targetId: input.targetId,
+      scheduleType: input.scheduleType,
+    };
+
+    if (input.scheduleType === ScheduleType.ONCE) {
+      baseFilter.startTime = input.startTime;
+      baseFilter.endTime = input.endTime;
+    } else {
+      baseFilter.startTimeOfDay = input.startTimeOfDay;
+      baseFilter.endTimeOfDay = input.endTimeOfDay;
+    }
+
+    const candidates = await this.scheduleModel.find(baseFilter);
+    const incomingName = this.normalizeScheduleName(input.title);
+
+    for (const candidate of candidates) {
+      if (excludeId && String(candidate._id) === excludeId) continue;
+      if (!this.sameScheduleTiming(candidate, input)) continue;
+
+      const candidateName = this.normalizeScheduleName(candidate.title);
+      const namesMatch =
+        incomingName !== undefined
+          ? candidateName === incomingName
+          : candidateName === undefined;
+
+      if (namesMatch) {
+        throw new BadRequestException(
+          'Duplicate schedule detected (same name/timing, case-insensitive)',
+        );
+      }
+    }
+  }
 
   private async validateTarget(
     targetType: ScheduleTargetType,
@@ -60,6 +163,18 @@ export class AdminSchedulesService {
     await this.validateTarget(dto.targetType, dto.targetId);
 
     const normalized = normalizeScheduleData(dto);
+
+    await this.assertNoDuplicateSchedule({
+      targetType: dto.targetType,
+      targetId: dto.targetId,
+      scheduleType: normalized.scheduleType as ScheduleType,
+      startTimeOfDay: normalized.startTimeOfDay as string | undefined,
+      endTimeOfDay: normalized.endTimeOfDay as string | undefined,
+      daysOfWeek: normalized.daysOfWeek as number[] | undefined,
+      startTime: normalized.startTime as Date | undefined,
+      endTime: normalized.endTime as Date | undefined,
+      title: dto.title,
+    });
 
     const schedule = new this.scheduleModel({
       targetType: dto.targetType,
@@ -212,6 +327,21 @@ export class AdminSchedulesService {
     }
 
     const normalized = normalizeScheduleData(dto, existing);
+    await this.assertNoDuplicateSchedule(
+      {
+        targetType: existing.targetType,
+        targetId: String(existing.targetId),
+        scheduleType: normalized.scheduleType as ScheduleType,
+        startTimeOfDay: normalized.startTimeOfDay as string | undefined,
+        endTimeOfDay: normalized.endTimeOfDay as string | undefined,
+        daysOfWeek: normalized.daysOfWeek as number[] | undefined,
+        startTime: normalized.startTime as Date | undefined,
+        endTime: normalized.endTime as Date | undefined,
+        title: dto.title !== undefined ? dto.title : existing.title,
+      },
+      id,
+    );
+
     const updateData: Record<string, unknown> = {
       ...normalized,
     };
