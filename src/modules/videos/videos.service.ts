@@ -502,11 +502,10 @@ export class VideosService {
   }
 
   async related(videoId: string, query: SearchVideosQueryDto) {
-    const source = (await this.videoModel
+    const source = await this.videoModel
       .findById(videoId)
-      .populate('channelId', 'name logoUrl')
-      .populate('programId', 'title')
-      .exec()) as unknown as SearchVideoDocument | null;
+      .select('_id channelId programId')
+      .exec();
     if (!source) {
       throw new NotFoundException('Video not found');
     }
@@ -515,76 +514,32 @@ export class VideosService {
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    const sourceChannelId = this.getEntityId(source.channelId?._id ?? source.channelId);
-    const sourceProgramId = this.getEntityId(source.programId);
-    const semanticTerms = this.buildSemanticTerms(this.getVideoText(source)).slice(0, 12);
-    const regexTerms = semanticTerms
-      .filter((term) => term.length >= 3)
-      .map((term) => new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
-
-    const baseFilter: Record<string, unknown> = {
+    const filter: Record<string, unknown> = {
       _id: { $ne: source._id },
       isActive: true,
       visibility: VideoVisibility.PUBLIC,
     };
 
-    const orClauses: Record<string, unknown>[] = [];
-    if (sourceChannelId) orClauses.push({ channelId: sourceChannelId });
-    if (sourceProgramId) orClauses.push({ programId: sourceProgramId });
-    for (const regex of regexTerms) {
-      orClauses.push({ title: regex }, { description: regex });
+    const relatedClauses: Record<string, unknown>[] = [];
+    if (source.channelId) relatedClauses.push({ channelId: source.channelId });
+    if (source.programId) relatedClauses.push({ programId: source.programId });
+    if (relatedClauses.length > 0) {
+      filter.$or = relatedClauses;
     }
 
-    const candidateFilter: Record<string, unknown> =
-      orClauses.length > 0 ? { ...baseFilter, $or: orClauses } : baseFilter;
-
-    let candidates = (await this.videoModel
-      .find(candidateFilter)
-      .sort({ publishedAt: -1, createdAt: -1 })
-      .limit(120)
-      .populate('channelId', 'name logoUrl')
-      .populate('programId', 'title')
-      .exec()) as unknown as SearchVideoDocument[];
-
-    // Broaden the pool when semantic prefilter is sparse.
-    if (candidates.length < 24) {
-      const fallback = (await this.videoModel
-        .find(baseFilter)
-        .sort({ isFeatured: -1, likeCount: -1, viewCount: -1, publishedAt: -1, createdAt: -1 })
-        .limit(120)
+    const [videos, total] = await Promise.all([
+      this.videoModel
+        .find(filter)
+        .sort({ publishedAt: -1, createdAt: -1, viewCount: -1 })
+        .skip(skip)
+        .limit(limit)
         .populate('channelId', 'name logoUrl')
-        .populate('programId', 'title')
-        .exec()) as unknown as SearchVideoDocument[];
-
-      const seen = new Set(candidates.map((video) => video._id.toString()));
-      for (const candidate of fallback) {
-        const id = candidate._id.toString();
-        if (seen.has(id)) continue;
-        seen.add(id);
-        candidates.push(candidate);
-      }
-    }
-
-    const ranked = candidates
-      .map((video) => ({
-        video,
-        score: this.computeRelatedScore(source, video),
-      }))
-      .filter((entry) => entry.score > 0)
-      .sort((a, b) => b.score - a.score);
-
-    // Diversify only a top window to keep request latency low under load.
-    const rerankWindow = Math.min(
-      ranked.length,
-      Math.max(skip + limit + 40, 80),
-    );
-    const diversifiedTop = this.mmrDiversify(ranked.slice(0, rerankWindow));
-    const ordered = [...diversifiedTop, ...ranked.slice(rerankWindow)];
-    const total = ordered.length;
-    const pageItems = ordered.slice(skip, skip + limit);
+        .exec(),
+      this.videoModel.countDocuments(filter),
+    ]);
 
     return this.paginated(
-      pageItems.map((entry) => this.mapVideo(entry.video)),
+      videos.map((video) => this.mapVideo(video as unknown as SearchVideoDocument)),
       total,
       page,
       limit,
