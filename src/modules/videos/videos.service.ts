@@ -14,6 +14,10 @@ type SearchVideoDocument = VideoDocument & {
     name?: string;
     logoUrl?: string;
   } | null;
+  programId?: {
+    _id?: { toString(): string };
+    title?: string;
+  } | { toString(): string } | null;
   createdAt?: Date;
   publishedAt?: Date;
 };
@@ -66,6 +70,46 @@ export class VideosService {
     }
 
     return Array.from(terms);
+  }
+
+  private uniqueTokens(text?: string): string[] {
+    return Array.from(new Set(this.tokenize(text)));
+  }
+
+  private jaccardSimilarity(aTokens: string[], bTokens: string[]): number {
+    if (aTokens.length === 0 || bTokens.length === 0) return 0;
+    const a = new Set(aTokens);
+    const b = new Set(bTokens);
+    let intersection = 0;
+    a.forEach((token) => {
+      if (b.has(token)) intersection += 1;
+    });
+    const union = a.size + b.size - intersection;
+    return union > 0 ? intersection / union : 0;
+  }
+
+  private getVideoText(video: SearchVideoDocument): string {
+    const programTitle =
+      video.programId && typeof video.programId === 'object' && 'title' in video.programId
+        ? (video.programId.title ?? '')
+        : '';
+    return [video.title, video.description, video.channelId?.name, programTitle]
+      .filter(Boolean)
+      .join(' ');
+  }
+
+  private getEntityId(value: unknown): string | undefined {
+    if (!value) return undefined;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object' && value !== null) {
+      const obj = value as { _id?: { toString(): string }; toString?: () => string };
+      if (obj._id?.toString) return obj._id.toString();
+      if (obj.toString) {
+        const text = obj.toString();
+        if (text && text !== '[object Object]') return text;
+      }
+    }
+    return undefined;
   }
 
   private diceCoefficient(a: string, b: string): number {
@@ -137,6 +181,103 @@ export class VideosService {
     }
 
     return score;
+  }
+
+  private computeRelatedScore(
+    source: SearchVideoDocument,
+    candidate: SearchVideoDocument,
+  ): number {
+    const sourceTitle = this.normalize(source.title);
+    const sourceText = this.normalize(this.getVideoText(source));
+    const candidateTitle = this.normalize(candidate.title);
+    const candidateText = this.normalize(this.getVideoText(candidate));
+
+    const sourceTitleTokens = this.uniqueTokens(sourceTitle);
+    const sourceTextTokens = this.uniqueTokens(sourceText);
+    const candidateTitleTokens = this.uniqueTokens(candidateTitle);
+    const candidateTextTokens = this.uniqueTokens(candidateText);
+
+    const titleOverlap = this.jaccardSimilarity(sourceTitleTokens, candidateTitleTokens);
+    const textOverlap = this.jaccardSimilarity(sourceTextTokens, candidateTextTokens);
+
+    const sourceQuery = [
+      source.title,
+      typeof source.programId === 'object' && source.programId && 'title' in source.programId
+        ? source.programId.title
+        : '',
+      source.channelId?.name,
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    let score = 0;
+    score += this.computeSemanticScore(candidate, sourceQuery) * 0.75;
+    score += titleOverlap * 160;
+    score += textOverlap * 120;
+    score += this.diceCoefficient(sourceTitle, candidateTitle) * 90;
+    score += this.diceCoefficient(sourceText, candidateText) * 60;
+
+    const sourceProgramId = this.getEntityId(source.programId);
+    const candidateProgramId = this.getEntityId(candidate.programId);
+    const sourceChannelId = this.getEntityId(source.channelId?._id ?? source.channelId);
+    const candidateChannelId = this.getEntityId(candidate.channelId?._id ?? candidate.channelId);
+
+    if (sourceProgramId && candidateProgramId && sourceProgramId === candidateProgramId) {
+      score += 180;
+    }
+    if (sourceChannelId && candidateChannelId && sourceChannelId === candidateChannelId) {
+      score += 70;
+    }
+
+    return score;
+  }
+
+  private pairwiseSemanticSimilarity(
+    a: SearchVideoDocument,
+    b: SearchVideoDocument,
+  ): number {
+    const aText = this.normalize(this.getVideoText(a));
+    const bText = this.normalize(this.getVideoText(b));
+    const jaccard = this.jaccardSimilarity(this.uniqueTokens(aText), this.uniqueTokens(bText));
+    const dice = this.diceCoefficient(aText, bText);
+    return Math.max(0, Math.min(1, jaccard * 0.6 + dice * 0.4));
+  }
+
+  private mmrDiversify(
+    ranked: { video: SearchVideoDocument; score: number }[],
+    lambda = 0.78,
+  ): { video: SearchVideoDocument; score: number }[] {
+    if (ranked.length <= 2) return ranked;
+
+    const remaining = [...ranked];
+    const selected: { video: SearchVideoDocument; score: number }[] = [];
+
+    while (remaining.length > 0) {
+      let bestIndex = 0;
+      let bestScore = Number.NEGATIVE_INFINITY;
+
+      for (let i = 0; i < remaining.length; i += 1) {
+        const candidate = remaining[i];
+        const redundancy =
+          selected.length === 0
+            ? 0
+            : Math.max(
+                ...selected.map((picked) =>
+                  this.pairwiseSemanticSimilarity(candidate.video, picked.video),
+                ),
+              );
+
+        const mmrScore = lambda * candidate.score - (1 - lambda) * redundancy * 100;
+        if (mmrScore > bestScore) {
+          bestScore = mmrScore;
+          bestIndex = i;
+        }
+      }
+
+      selected.push(remaining.splice(bestIndex, 1)[0]);
+    }
+
+    return selected;
   }
 
   private mapVideo(video: SearchVideoDocument) {
@@ -361,7 +502,11 @@ export class VideosService {
   }
 
   async related(videoId: string, query: SearchVideosQueryDto) {
-    const source = await this.videoModel.findById(videoId).exec();
+    const source = (await this.videoModel
+      .findById(videoId)
+      .populate('channelId', 'name logoUrl')
+      .populate('programId', 'title')
+      .exec()) as unknown as SearchVideoDocument | null;
     if (!source) {
       throw new NotFoundException('Video not found');
     }
@@ -370,30 +515,70 @@ export class VideosService {
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    const filter: Record<string, unknown> = {
+    const sourceChannelId = this.getEntityId(source.channelId?._id ?? source.channelId);
+    const sourceProgramId = this.getEntityId(source.programId);
+    const semanticTerms = this.buildSemanticTerms(this.getVideoText(source)).slice(0, 12);
+    const regexTerms = semanticTerms
+      .filter((term) => term.length >= 3)
+      .map((term) => new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+
+    const baseFilter: Record<string, unknown> = {
       _id: { $ne: source._id },
       isActive: true,
       visibility: VideoVisibility.PUBLIC,
-      $or: [{ channelId: source.channelId }],
     };
 
-    if (source.programId) {
-      (filter.$or as Array<Record<string, unknown>>).push({ programId: source.programId });
+    const orClauses: Record<string, unknown>[] = [];
+    if (sourceChannelId) orClauses.push({ channelId: sourceChannelId });
+    if (sourceProgramId) orClauses.push({ programId: sourceProgramId });
+    for (const regex of regexTerms) {
+      orClauses.push({ title: regex }, { description: regex });
     }
 
-    const [videos, total] = await Promise.all([
-      this.videoModel
-        .find(filter)
-        .sort({ publishedAt: -1, createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
+    const candidateFilter =
+      orClauses.length > 0 ? ({ ...baseFilter, $or: orClauses } as const) : (baseFilter as const);
+
+    let candidates = (await this.videoModel
+      .find(candidateFilter)
+      .sort({ publishedAt: -1, createdAt: -1 })
+      .limit(300)
+      .populate('channelId', 'name logoUrl')
+      .populate('programId', 'title')
+      .exec()) as unknown as SearchVideoDocument[];
+
+    // Broaden the pool when semantic prefilter is sparse.
+    if (candidates.length < 40) {
+      const fallback = (await this.videoModel
+        .find(baseFilter)
+        .sort({ isFeatured: -1, likeCount: -1, viewCount: -1, publishedAt: -1, createdAt: -1 })
+        .limit(250)
         .populate('channelId', 'name logoUrl')
-        .exec(),
-      this.videoModel.countDocuments(filter),
-    ]);
+        .populate('programId', 'title')
+        .exec()) as unknown as SearchVideoDocument[];
+
+      const seen = new Set(candidates.map((video) => video._id.toString()));
+      for (const candidate of fallback) {
+        const id = candidate._id.toString();
+        if (seen.has(id)) continue;
+        seen.add(id);
+        candidates.push(candidate);
+      }
+    }
+
+    const ranked = candidates
+      .map((video) => ({
+        video,
+        score: this.computeRelatedScore(source, video),
+      }))
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    const diversified = this.mmrDiversify(ranked);
+    const total = diversified.length;
+    const pageItems = diversified.slice(skip, skip + limit);
 
     return this.paginated(
-      videos.map((video) => this.mapVideo(video as unknown as SearchVideoDocument)),
+      pageItems.map((entry) => this.mapVideo(entry.video)),
       total,
       page,
       limit,
