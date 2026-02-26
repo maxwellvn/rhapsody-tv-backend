@@ -161,7 +161,10 @@ export class NotificationsService {
 
         if (!response.ok) {
           this.logger.warn(
-            `Expo push send failed with status ${response.status}`,
+            `Expo push send failed with status ${response.status}: ${JSON.stringify(json)}`,
+          );
+          this.logger.warn(
+            `Request payload: ${JSON.stringify(chunk.map(m => ({ to: m.to, title: m.title })))}`,
           );
           continue;
         }
