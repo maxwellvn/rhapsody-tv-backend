@@ -118,69 +118,59 @@ export class NotificationsService {
     );
     if (tokens.length === 0) return { sent: 0, tokens: 0 };
 
-    const messages = tokens.map((to) => ({
-      to,
-      title: params.title,
-      body: params.body,
-      sound: 'default',
-      priority: 'high',
-      channelId: 'admin-alerts',
-      data: {
-        ...(params.data || {}),
-        type: params.type,
-      },
-    }));
-
-    const chunks: typeof messages[] = [];
-    for (let i = 0; i < messages.length; i += 100) {
-      chunks.push(messages.slice(i, i + 100));
-    }
-
     const invalidTokens: string[] = [];
 
-    for (const chunk of chunks) {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    };
+    const expoAccessToken = process.env.EXPO_ACCESS_TOKEN?.trim();
+    if (expoAccessToken) {
+      headers.Authorization = `Bearer ${expoAccessToken}`;
+    }
+
+    // Send each token individually to avoid PUSH_TOO_MANY_EXPERIENCE_IDS
+    // when tokens belong to different Expo projects.
+    for (const to of tokens) {
       try {
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
+        const message = {
+          to,
+          title: params.title,
+          body: params.body,
+          sound: 'default' as const,
+          priority: 'high' as const,
+          channelId: 'admin-alerts',
+          data: {
+            ...(params.data || {}),
+            type: params.type,
+          },
         };
-        const expoAccessToken = process.env.EXPO_ACCESS_TOKEN?.trim();
-        if (expoAccessToken) {
-          headers.Authorization = `Bearer ${expoAccessToken}`;
-        }
 
         const response = await fetch('https://exp.host/--/api/v2/push/send', {
           method: 'POST',
           headers,
-          body: JSON.stringify(chunk),
+          body: JSON.stringify(message),
         });
 
         const json = (await response.json().catch(() => null)) as
-          | { data?: Array<{ status?: string; details?: { error?: string } }> }
+          | { data?: { status?: string; details?: { error?: string } } }
           | null;
 
         if (!response.ok) {
           this.logger.warn(
-            `Expo push send failed with status ${response.status}: ${JSON.stringify(json)}`,
-          );
-          this.logger.warn(
-            `Request payload: ${JSON.stringify(chunk.map(m => ({ to: m.to, title: m.title })))}`,
+            `Expo push send failed for ${to}: ${response.status} ${JSON.stringify(json)}`,
           );
           continue;
         }
 
-        const results = Array.isArray(json?.data) ? json!.data! : [];
-        results.forEach((result, index) => {
-          if (
-            result?.status === 'error' &&
-            result?.details?.error === 'DeviceNotRegistered'
-          ) {
-            const token = chunk[index]?.to;
-            if (token) invalidTokens.push(token);
-          }
-        });
+        if (
+          json?.data?.status === 'error' &&
+          json?.data?.details?.error === 'DeviceNotRegistered'
+        ) {
+          invalidTokens.push(to);
+        }
       } catch (error) {
-        this.logger.warn(`Expo push send error: ${String(error)}`);
+        this.logger.warn(`Expo push send error for ${to}: ${String(error)}`);
       }
     }
 
