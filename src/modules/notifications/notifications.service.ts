@@ -178,7 +178,7 @@ export class NotificationsService {
       await this.deactivatePushTokens(invalidTokens);
     }
 
-    return { sent: messages.length, tokens: tokens.length };
+    return { sent: tokens.length, tokens: tokens.length };
   }
 
   async createNotification(params: {
