@@ -188,7 +188,10 @@ export class DonationsService {
     const safeLimit = Math.max(1, Math.min(100, limit));
     const skip = (safePage - 1) * safeLimit;
 
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = {
+      // Admin app should only show successful donations by default.
+      status: DonationStatus.COMPLETED,
+    };
     if (method) filter.method = method;
     if (status) filter.status = status;
 
@@ -238,6 +241,10 @@ export class DonationsService {
 
   async getStats() {
     const [results] = await this.donationModel.aggregate([
+      {
+        // Admin donation stats should reflect successful donations only.
+        $match: { status: DonationStatus.COMPLETED },
+      },
       {
         $facet: {
           totals: [
